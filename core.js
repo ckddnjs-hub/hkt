@@ -105,10 +105,19 @@ function startApp() {
 // ── 앱 표시 ─────────────────────────────────────────────────────────
 function showApp() {
   document.getElementById('loading-screen').classList.add('hidden');
-  document.getElementById('app').classList.add('show');
+  const appEl = document.getElementById('app');
+  appEl.classList.add('show');
   renderSidebarUser();
   updateWelfareMiniScore();
+  // 초기 페이지 렌더
+  onPageEnter(APP.currentPage || 'home');
 }
+
+// ── 페이지 타이틀 맵 ─────────────────────────────────────────────────
+const PAGE_TITLES = {
+  home: '대시보드', profile: '내 정보', benefits: '맞춤 혜택',
+  news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드', settings: '설정',
+};
 
 // ── 라우터 ──────────────────────────────────────────────────────────
 function initRouter() {
@@ -117,8 +126,8 @@ function initRouter() {
   APP.currentPage = page;
 
   // 뒤로가기
-  window.addEventListener('popstate', (e) => {
-    navigateTo(e.state?.page || 'home', false);
+  window.addEventListener('popstate', e => {
+    navigateTo(e.state?.page || 'home', false, true);
   });
 
   // 바텀 네비 클릭
@@ -132,48 +141,58 @@ function initRouter() {
   });
 }
 
-function navigateTo(page, pushState = true) {
+function navigateTo(page, pushState = true, isBack = false) {
   if (!APP.isOnboarded && page !== 'home') {
     toast('먼저 시작하기를 완료해주세요.', 'warn');
     return;
   }
 
+  const prevPage = APP.currentPage;
   APP.currentPage = page;
 
-  // 모든 페이지 숨기기
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  // 페이지 순서로 슬라이드 방향 결정
+  const pageOrder = ['home', 'profile', 'benefits', 'news', 'lifecycle', 'apply', 'settings'];
+  const prevIdx = pageOrder.indexOf(prevPage);
+  const nextIdx = pageOrder.indexOf(page);
+  const goingBack = isBack || (prevIdx > nextIdx);
 
-  // 현재 페이지 표시
+  // 현재 활성 페이지에 애니메이션 클래스 적용
+  const prevEl = document.getElementById(`page-${prevPage}`);
   const pageEl = document.getElementById(`page-${page}`);
-  if (pageEl) pageEl.classList.add('active');
 
-  // 네비 활성화 업데이트
-  document.querySelectorAll('[data-nav]').forEach(el => {
+  if (prevEl && prevEl !== pageEl) prevEl.classList.remove('active');
+  if (pageEl) {
+    if (goingBack) pageEl.classList.add('slide-left');
+    else pageEl.classList.remove('slide-left');
+    pageEl.classList.add('active');
+    // 애니메이션 클래스 정리
+    if (goingBack) {
+      requestAnimationFrame(() => {
+        setTimeout(() => pageEl.classList.remove('slide-left'), 250);
+      });
+    }
+  }
+
+  // 바텀 네비 활성화 (FAB 제외한 nav 아이템)
+  document.querySelectorAll('.bottom-nav-item[data-nav]').forEach(el => {
     el.classList.toggle('active', el.dataset.nav === page);
   });
+  // 사이드바 활성화
   document.querySelectorAll('[data-page]').forEach(el => {
     el.classList.toggle('active', el.dataset.page === page);
   });
 
-  // 페이지 타이틀 업데이트
-  const titles = {
-    home: '대시보드', profile: '내 정보', benefits: '맞춤 혜택',
-    news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드', settings: '설정'
-  };
-  const headerTitle = document.getElementById('main-header-title');
-  if (headerTitle) headerTitle.textContent = titles[page] || page;
-
-  // 모바일 헤더 타이틀
-  const mobileTitle = document.getElementById('mobile-header-title');
-  if (mobileTitle) mobileTitle.textContent = titles[page] || page;
+  // 헤더 타이틀 (데스크탑: 오른쪽 / 모바일: 가운데)
+  const headerTitle = document.getElementById('header-title');
+  if (headerTitle) headerTitle.textContent = PAGE_TITLES[page] || '';
 
   // 히스토리
   if (pushState) {
     history.pushState({ page }, '', `?page=${page}`);
   }
 
-  // 스크롤 상단
-  document.querySelector('.main-content')?.scrollTo(0, 0);
+  // 스크롤 상단 (앱 바디)
+  document.querySelector('.app-body')?.scrollTo(0, 0);
 
   // 페이지별 초기화
   onPageEnter(page);

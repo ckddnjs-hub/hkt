@@ -200,7 +200,6 @@ function openBenefitDetail(benefitId) {
   `;
 
   openModal('benefit-modal-overlay');
-  modal.classList.add('open');
 }
 
 // ── AI 에이전트 실행 핸들러 ─────────────────────────────────────────

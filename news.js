@@ -160,5 +160,4 @@ function openNewsDetail(newsId) {
   `;
 
   openModal('news-modal-overlay');
-  modal.classList.add('open');
 }
