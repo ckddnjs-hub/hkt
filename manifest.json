@@ -1,0 +1,42 @@
+{
+  "name": "복지ON - AI 맞춤형 복지 혜택",
+  "short_name": "복지ON",
+  "description": "NVIDIA AI 멀티에이전트가 찾아주는 나만의 복지 혜택 플랫폼",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0F172A",
+  "theme_color": "#3B82F6",
+  "lang": "ko",
+  "categories": ["government", "social", "utilities"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "혜택 찾기",
+      "short_name": "혜택",
+      "description": "AI 맞춤 복지 혜택 검색",
+      "url": "/?page=benefits",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "생애 계획",
+      "short_name": "생애",
+      "description": "생애주기별 복지 플랜",
+      "url": "/?page=lifecycle",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

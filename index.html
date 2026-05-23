@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="description" content="NVIDIA AI 멀티에이전트가 찾아주는 맞춤형 복지 혜택 플랫폼">
+  <meta name="theme-color" content="#3B82F6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="복지ON">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="복지ON - AI 맞춤 복지 혜택">
+  <meta property="og:description" content="NVIDIA AI가 찾아주는 나만의 복지 혜택">
+  <meta property="og:type" content="website">
+
+  <title>복지ON - AI 맞춤형 복지 플랫폼</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" href="icon-192.png">
+  <link rel="stylesheet" href="app.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+
+<!-- ── 로딩 화면 ─────────────────────────────────────────────────── -->
+<div id="loading-screen">
+  <div class="ld-logo">🏛️</div>
+  <div class="ld-title">복지ON</div>
+  <div class="ld-sub">AI 복지 혜택 분석 중...</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- ── 온보딩 ─────────────────────────────────────────────────────── -->
+<div id="onboarding-page">
+  <div class="onboarding-wrap">
+    <div class="onboarding-hero">
+      <div class="ob-logo">🏛️</div>
+      <div class="ob-title">복지ON</div>
+      <div class="ob-sub">
+        NVIDIA AI 멀티에이전트가<br>
+        나에게 맞는 복지 혜택을 찾아드립니다
+      </div>
+    </div>
+
+    <div class="ob-features">
+      <div class="ob-feature">
+        <div class="ob-feature-icon">🎯</div>
+        <div class="ob-feature-label">맞춤 혜택 매칭</div>
+      </div>
+      <div class="ob-feature">
+        <div class="ob-feature-icon">🤖</div>
+        <div class="ob-feature-label">AI 멀티에이전트</div>
+      </div>
+      <div class="ob-feature">
+        <div class="ob-feature-icon">🔮</div>
+        <div class="ob-feature-label">생애주기 플랜</div>
+      </div>
+      <div class="ob-feature">
+        <div class="ob-feature-icon">👥</div>
+        <div class="ob-feature-label">유사계층 분석</div>
+      </div>
+    </div>
+
+    <button class="btn-start" onclick="startApp()">
+      시작하기 →
+    </button>
+
+    <div style="margin-top:12px;font-size:.78rem;color:var(--text-dim);text-align:center">
+      개인정보는 기기에만 저장됩니다
+    </div>
+  </div>
+</div>
+
+<!-- ── 메인 앱 ─────────────────────────────────────────────────────── -->
+<div id="app">
+  <div class="app-layout">
+
+    <!-- ── 사이드바 (데스크탑) ── -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">
+          <div class="sidebar-logo-icon">🏛️</div>
+          <div class="sidebar-logo-text">복지ON</div>
+        </div>
+        <div class="sidebar-user" id="sidebar-user">
+          <div class="avatar" style="width:36px;height:36px;background:var(--bg3);font-size:1rem">👤</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name">프로필 설정</div>
+            <div class="sidebar-user-sub">클릭하여 입력</div>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section">
+          <div class="nav-section-label">메인</div>
+          <button class="nav-item active" data-page="home">
+            <span class="nav-icon">🏠</span>
+            <span>대시보드</span>
+          </button>
+          <button class="nav-item" data-page="profile">
+            <span class="nav-icon">👤</span>
+            <span>내 정보</span>
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">AI 혜택</div>
+          <button class="nav-item" data-page="benefits">
+            <span class="nav-icon">🎯</span>
+            <span>맞춤 혜택</span>
+          </button>
+          <button class="nav-item" data-page="lifecycle">
+            <span class="nav-icon">🔮</span>
+            <span>생애 계획</span>
+          </button>
+          <button class="nav-item" data-page="news">
+            <span class="nav-icon">📰</span>
+            <span>복지 뉴스</span>
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <div class="nav-section-label">도구</div>
+          <button class="nav-item" data-page="apply">
+            <span class="nav-icon">📋</span>
+            <span>신청 가이드</span>
+          </button>
+          <button class="nav-item" data-page="settings">
+            <span class="nav-icon">⚙️</span>
+            <span>설정</span>
+          </button>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="welfare-score-mini">
+          <div class="wsm-label">복지 점수</div>
+          <div class="wsm-score" id="wsm-score">--점</div>
+          <div class="wsm-sub" id="wsm-sub">프로필 입력 필요</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── 메인 콘텐츠 ── -->
+    <div class="main-area">
+
+      <!-- 모바일 헤더 -->
+      <header class="mobile-header">
+        <div class="mobile-logo">복지ON</div>
+        <div id="mobile-header-title" style="font-size:.95rem;font-weight:700">대시보드</div>
+        <button class="btn-icon" onclick="navigateTo('settings')">⚙️</button>
+      </header>
+
+      <!-- 데스크탑 헤더 -->
+      <header class="main-header" style="display:none" id="desktop-header">
+        <div id="main-header-title" class="main-header-title">대시보드</div>
+        <div class="header-actions">
+          <button class="btn-icon" onclick="toggleTheme()" title="테마 전환">🌙</button>
+          <button class="btn-icon" onclick="navigateTo('settings')">⚙️</button>
+        </div>
+      </header>
+
+      <!-- 페이지 콘텐츠 -->
+      <main class="main-content">
+        <div class="page active" id="page-home"></div>
+        <div class="page" id="page-profile"></div>
+        <div class="page" id="page-benefits"></div>
+        <div class="page" id="page-news"></div>
+        <div class="page" id="page-lifecycle"></div>
+        <div class="page" id="page-apply"></div>
+        <div class="page" id="page-settings"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ── 바텀 네비 (모바일) ── -->
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="bn-item active" data-nav="home">
+        <span class="bn-icon">🏠</span>
+        <span>홈</span>
+      </button>
+      <button class="bn-item" data-nav="benefits">
+        <span class="bn-icon">🎯</span>
+        <span>혜택</span>
+      </button>
+      <button class="bn-item bn-fab" data-nav="benefits" onclick="navigateTo('benefits');setTimeout(handleRunAgents,300)">
+        <div class="bn-fab-circle">🤖</div>
+        <span>AI분석</span>
+      </button>
+      <button class="bn-item" data-nav="lifecycle">
+        <span class="bn-icon">🔮</span>
+        <span>생애</span>
+      </button>
+      <button class="bn-item" data-nav="news">
+        <span class="bn-icon">📰</span>
+        <span>뉴스</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- ── 토스트 ─────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── 혜택 상세 모달 ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="benefit-modal-overlay" onclick="closeAllModals()"></div>
+<div class="modal" id="benefit-detail-modal">
+  <div class="modal-handle"></div>
+  <div id="benefit-detail-content"></div>
+</div>
+
+<!-- ── 뉴스 상세 모달 ─────────────────────────────────────────────── -->
+<div class="modal-overlay" id="news-modal-overlay" onclick="closeAllModals()"></div>
+<div class="modal" id="news-detail-modal">
+  <div class="modal-handle"></div>
+  <div id="news-detail-content"></div>
+</div>
+
+<!-- ── 스크립트 ──────────────────────────────────────────────────── -->
+<script src="constants.js"></script>
+<script src="ui.js"></script>
+<script src="agents.js"></script>
+<script src="profile.js"></script>
+<script src="benefits.js"></script>
+<script src="news.js"></script>
+<script src="lifecycle.js"></script>
+<script src="apply.js"></script>
+<script src="core.js"></script>
+
+<script>
+  // 데스크탑에서 main-header 표시
+  if (window.innerWidth > 768) {
+    const dh = document.getElementById('desktop-header');
+    if (dh) dh.style.display = 'flex';
+  }
+
+  // 모달 ESC 닫기
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAllModals();
+  });
+
+  // PWA 설치 배너
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    setTimeout(() => toast('📲 복지ON을 홈 화면에 추가하세요!', 'info', 5000), 3000);
+  });
+</script>
+
+</body>
+</html>
