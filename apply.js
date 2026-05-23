@@ -134,127 +134,126 @@ function renderHomePage() {
   const matched = APP.profile ? (APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits()) : [];
   const p = APP.profile;
   const urgentNews = SAMPLE_NEWS.filter(n => n.urgent).slice(0, 2);
+  const stage = p ? getCurrentStage(parseInt(p.age || 30)) : null;
+  const monthly = p ? Math.round(score * 1.5) : 0;
 
   page.innerHTML = `
-    <!-- 복지 점수 카드 -->
-    <div class="welfare-score-card">
-      <div class="wsc-top">
-        <div>
-          <div class="wsc-label">MY 복지 점수</div>
-          <div class="wsc-score">
-            <span id="home-score">${p ? score : '--'}</span>
-            <span>/ 100</span>
-          </div>
-          <div class="wsc-sub">
-            ${p ? `${esc(p.name)}님의 복지 혜택 가중치 점수` : '프로필을 입력하면 점수가 산출됩니다'}
-          </div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:.78rem;color:rgba(255,255,255,.6)">예상 혜택</div>
-          <div style="font-size:1.6rem;font-weight:900;color:#fff">${matched.length}<span style="font-size:.9rem">개</span></div>
-        </div>
+
+    <!-- 히어로: 토스 스타일 큰 숫자 -->
+    <div class="home-hero">
+      <div class="home-hero-label">${p ? `${esc(p.name || '내')} 복지 점수` : 'MY 복지 점수'}</div>
+      <div class="home-hero-score">
+        <span id="home-score">${p ? score : '--'}</span>
+        <span>/ 100</span>
       </div>
-      <div class="wsc-bar">
-        <div class="wsc-bar-label">
-          <span>기본</span><span>보통</span><span>높음</span>
-        </div>
-        <div class="wsc-bar-track">
-          <div class="wsc-bar-fill" id="home-score-bar" style="width:${p ? score : 0}%"></div>
-        </div>
+      <div class="home-hero-sub">
+        ${p ? `혜택 ${matched.length}개 · 예상 월 ${monthly}만원` : '프로필을 입력하면 분석됩니다'}
+      </div>
+      <div class="home-hero-bar">
+        <div class="home-hero-bar-fill" style="width:${p ? score : 0}%"></div>
       </div>
     </div>
-
-    <!-- 통계 카드 -->
-    ${p ? `
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value" id="stat-benefits">${matched.length}</div>
-          <div class="stat-label">맞춤 혜택</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--success)" id="stat-monthly">
-            ${Math.round(score * 1.5)}만
-          </div>
-          <div class="stat-label">예상 월 혜택액</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--warn)">${urgentNews.length}</div>
-          <div class="stat-label">긴급 뉴스</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value" style="color:var(--accent)">${getCurrentStage(parseInt(p.age || 30))?.icon || '🌱'}</div>
-          <div class="stat-label">${getCurrentStage(parseInt(p.age || 30))?.label || '청년기'}</div>
-        </div>
-      </div>` : ''}
 
     <!-- 프로필 없을 때 CTA -->
     ${!p ? `
-      <div class="card card-blue" style="text-align:center;padding:32px 24px;margin-bottom:20px">
-        <div style="font-size:2rem;margin-bottom:12px">🎯</div>
-        <div style="font-size:1.1rem;font-weight:900;margin-bottom:8px">맞춤 복지 혜택을 찾아드립니다</div>
-        <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:20px;line-height:1.6">
+      <div class="card" style="text-align:center;padding:28px 20px;margin-bottom:12px">
+        <div style="font-size:2.2rem;margin-bottom:14px">🎯</div>
+        <div style="font-size:1.05rem;font-weight:900;margin-bottom:8px;letter-spacing:-.02em">맞춤 복지 혜택을 찾아드립니다</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:20px;line-height:1.65">
           프로필을 입력하면 NVIDIA AI가<br>나만의 복지 혜택을 분석합니다
         </div>
-        <button class="btn btn-primary btn-lg" onclick="navigateTo('profile')">
-          📝 프로필 입력 시작
-        </button>
+        <button class="btn btn-primary btn-full btn-lg" onclick="navigateTo('profile')">프로필 입력 시작</button>
+      </div>` : ''}
+
+    <!-- 통계 -->
+    ${p ? `
+      <div class="stats-grid mb12">
+        <div class="stat-card">
+          <div class="stat-value">${matched.length}<span>개</span></div>
+          <div class="stat-label">맞춤 혜택</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--success)">${monthly}<span>만원</span></div>
+          <div class="stat-label">예상 월 혜택</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--danger)">${urgentNews.length}<span>건</span></div>
+          <div class="stat-label">긴급 소식</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="font-size:1.4rem">${stage?.icon || '🌱'}</div>
+          <div class="stat-label">${stage?.label || '청년기'}</div>
+        </div>
       </div>` : ''}
 
     <!-- 빠른 액션 -->
-    <div class="section-header">
-      <div class="section-title">빠른 메뉴</div>
-    </div>
-    <div class="quick-actions">
+    <div class="quick-actions mb12">
       ${[
-        { icon: '🎯', label: '맞춤 혜택', page: 'benefits' },
-        { icon: '🤖', label: 'AI 분석', page: 'benefits', action: 'runAgents' },
-        { icon: '🗓', label: '생애 계획', page: 'lifecycle' },
+        { icon: '🎁', label: '맞춤 혜택', page: 'benefits' },
+        { icon: '💬', label: 'AI 상담', page: 'chat' },
+        { icon: '🔮', label: '생애 계획', page: 'lifecycle' },
         { icon: '📰', label: '복지 뉴스', page: 'news' },
       ].map(qa => `
-        <div class="qa-btn" onclick="${qa.action === 'runAgents'
-          ? "navigateTo('benefits');setTimeout(handleRunAgents,300)"
-          : `navigateTo('${qa.page}')`}">
+        <button class="qa-btn" onclick="navigateTo('${qa.page}')">
           <div class="qa-icon">${qa.icon}</div>
           <div class="qa-label">${esc(qa.label)}</div>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
 
     <!-- 긴급 뉴스 -->
     ${urgentNews.length ? `
-      <div class="section-header mt8">
-        <div class="section-title">🔴 긴급 복지 소식</div>
+      <div class="section-header">
+        <div class="section-title">긴급 복지 소식</div>
         <div class="section-link" onclick="navigateTo('news')">더보기</div>
       </div>
-      ${urgentNews.map(n => `
-        <div class="news-card" onclick="navigateTo('news')">
-          <div class="news-urgent-dot"></div>
-          <div class="news-body">
-            <div class="news-title">${esc(n.title)}</div>
-            <div class="news-meta">
-              <span>${esc(n.source)}</span><span>·</span><span>${relDate(n.date)}</span>
+      <div style="border-radius:var(--radius);overflow:hidden;margin-bottom:12px">
+        ${urgentNews.map((n, i) => `
+          <div class="news-card${i === 0 ? ' rounded-top' : ''}${i === urgentNews.length-1 ? ' rounded-bottom' : ''}" onclick="navigateTo('news')">
+            <div class="news-urgent-dot"></div>
+            <div class="news-body">
+              <div class="news-title">${esc(n.title)}</div>
+              <div class="news-meta"><span>${esc(n.source)}</span><span>·</span><span>${relDate(n.date)}</span></div>
             </div>
-          </div>
-        </div>`).join('')}` : ''}
+          </div>`).join('')}
+      </div>` : ''}
 
-    <!-- 맞춤 혜택 미리보기 -->
+    <!-- 맞춤 혜택 TOP3 -->
     ${p && matched.length ? `
-      <div class="section-header mt8">
-        <div class="section-title">⭐ 맞춤 혜택 TOP 3</div>
+      <div class="section-header">
+        <div class="section-title">맞춤 혜택 TOP 3</div>
         <div class="section-link" onclick="navigateTo('benefits')">전체보기</div>
       </div>
-      ${matched.slice(0, 3).map(b => renderBenefitCard(b)).join('')}` : ''}
+      <div class="benefit-list-group">
+        ${matched.slice(0, 3).map(b => renderBenefitCard(b)).join('')}
+      </div>` : ''}
 
-    <!-- 신청 가이드 배너 -->
-    <div class="card card-hover mt8" style="background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(139,92,246,.1));border-color:rgba(99,102,241,.3)" onclick="navigateTo('apply')">
-      <div style="display:flex;align-items:center;gap:14px">
-        <span style="font-size:1.8rem">📋</span>
-        <div style="flex:1">
-          <div style="font-weight:700">신청 방법을 모르시나요?</div>
-          <div style="font-size:.83rem;color:var(--text-muted);margin-top:2px">단계별 신청 가이드 →</div>
-        </div>
+    <!-- 복지 라디오 배너 -->
+    <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer;background:rgba(239,68,68,.06)" onclick="navigateTo('voice')">
+      <div style="width:44px;height:44px;border-radius:14px;background:rgba(239,68,68,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">📻</div>
+      <div style="flex:1">
+        <div style="font-weight:700;letter-spacing:-.01em">복지 라디오 듣기 <span style="font-size:.72rem;background:var(--danger);color:#fff;padding:2px 8px;border-radius:100px;vertical-align:middle;font-weight:800">LIVE</span></div>
+        <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">버튼 하나로 오늘의 복지 소식 청취</div>
       </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
+    <!-- AI 상담 배너 -->
+    <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer" onclick="navigateTo('chat')">
+      <div style="width:44px;height:44px;border-radius:14px;background:rgba(49,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">💬</div>
+      <div style="flex:1">
+        <div style="font-weight:700;letter-spacing:-.01em">AI 복지 상담사에게 물어보기</div>
+        <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">궁금한 혜택을 바로 대화로 확인</div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
   `;
+
+  if (p) {
+    setTimeout(() => {
+      const el = document.getElementById('home-score');
+      if (el) countUp(el, score, 600);
+    }, 100);
+  }
 }
 
 // ── 설정 페이지 렌더링 ──────────────────────────────────────────────
@@ -269,44 +268,47 @@ function renderSettingsPage() {
     <div class="page-sub">앱 환경 및 API 설정</div>
 
     <!-- AI API 설정 -->
+    <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">AI API 키</div>
     <div class="card mb16">
-      <div class="section-title" style="margin-bottom:14px">🤖 AI API 설정</div>
-
-      <div class="api-key-section">
-        <div class="api-key-label">🟢 NVIDIA NIM API Key <span style="font-size:.72rem;color:var(--text-dim)">(멀티에이전트 분석)</span></div>
+      <div class="api-key-section" style="background:var(--bg3);margin-bottom:10px">
+        <div class="api-key-label">NVIDIA NIM API Key</div>
         <div class="api-key-input-wrap">
           <input class="api-key-input" id="nvidia-key" type="password" placeholder="nvapi-xxxxxxxxxxxx" value="${esc(s.nvidiaKey || '')}">
           <button class="api-key-toggle" onclick="toggleKeyVisibility('nvidia-key',this)">👁</button>
         </div>
-        <div class="form-hint">NVIDIA NIM 포털에서 발급: build.nvidia.com</div>
+        <div class="form-hint">build.nvidia.com에서 발급</div>
       </div>
-
-      <div class="api-key-section mt8">
-        <div class="api-key-label">🔵 Claude API Key <span style="font-size:.72rem;color:var(--text-dim)">(추가 AI 기능)</span></div>
+      <div class="api-key-section" style="background:var(--bg3)">
+        <div class="api-key-label">Claude API Key</div>
         <div class="api-key-input-wrap">
           <input class="api-key-input" id="claude-key" type="password" placeholder="sk-ant-xxxxxxxxxxxx" value="${esc(s.claudeKey || '')}">
           <button class="api-key-toggle" onclick="toggleKeyVisibility('claude-key',this)">👁</button>
         </div>
       </div>
-
-      <button class="btn btn-primary btn-full mt12" onclick="saveApiKeys()">🔑 API 키 저장</button>
+      <div class="api-key-section" style="background:var(--bg3);margin-top:10px">
+        <div class="api-key-label">KOSIS API Key <span style="font-size:.7rem;color:var(--text-dim);font-weight:400">(지역 통계 실시간 연동)</span></div>
+        <div class="api-key-input-wrap">
+          <input class="api-key-input" id="kosis-key" type="password" placeholder="kosis.kr에서 발급" value="${esc(s.kosisKey || '')}">
+          <button class="api-key-toggle" onclick="toggleKeyVisibility('kosis-key',this)">👁</button>
+        </div>
+        <div class="form-hint">kosis.kr → OpenAPI 신청 → 인증키 발급</div>
+      </div>
+      <button class="btn btn-primary btn-full mt12" onclick="saveApiKeys()">저장</button>
     </div>
 
     <!-- 일반 설정 -->
-    <div class="card mb16">
-      <div class="section-title" style="margin-bottom:14px">⚙️ 일반</div>
-
+    <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">일반</div>
+    <div class="settings-group mb16">
       <div class="settings-item" onclick="toggleTheme()">
         <div class="settings-item-left">
           <div class="settings-icon">${s.theme === 'dark' ? '🌙' : '☀️'}</div>
           <div>
             <div class="settings-label">다크 모드</div>
-            <div class="settings-sub">현재: ${s.theme === 'dark' ? '다크' : '라이트'} 모드</div>
+            <div class="settings-sub">${s.theme === 'dark' ? '켜짐' : '꺼짐'}</div>
           </div>
         </div>
         <div class="toggle-switch ${s.theme === 'dark' ? 'on' : ''}"></div>
       </div>
-
       <div class="settings-item" onclick="requestNotifications()">
         <div class="settings-item-left">
           <div class="settings-icon">🔔</div>
@@ -319,106 +321,68 @@ function renderSettingsPage() {
       </div>
     </div>
 
-    <!-- 데이터 관리 -->
-    <div class="card mb16">
-      <div class="section-title" style="margin-bottom:14px">💾 데이터</div>
+    <!-- 데이터 -->
+    <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">데이터</div>
+    <div class="settings-group mb16">
       <div class="settings-item" onclick="exportData()">
         <div class="settings-item-left">
           <div class="settings-icon">📤</div>
-          <div>
-            <div class="settings-label">데이터 내보내기</div>
-            <div class="settings-sub">프로필 및 혜택 정보 JSON 저장</div>
-          </div>
+          <div><div class="settings-label">내보내기</div><div class="settings-sub">프로필 및 혜택 JSON 저장</div></div>
         </div>
-        <span style="color:var(--text-dim)">→</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
-      <div class="settings-item" onclick="confirmClearData()">
-        <div class="settings-item-left">
-          <div class="settings-icon">🗑</div>
-          <div>
-            <div class="settings-label" style="color:var(--danger)">데이터 초기화</div>
-            <div class="settings-sub">모든 설정 및 프로필 삭제</div>
-          </div>
-        </div>
-        <span style="color:var(--text-dim)">→</span>
-      </div>
-    </div>
-
-    <!-- Supabase DB 상태 -->
-    <div class="card mb16">
-      <div class="section-title" style="margin-bottom:14px">🗄️ 데이터베이스</div>
-
-      <div class="settings-item" style="cursor:default">
-        <div class="settings-item-left">
-          <div class="settings-icon">🟢</div>
-          <div>
-            <div class="settings-label">Supabase 연결</div>
-            <div class="settings-sub" id="db-status">확인 중...</div>
-          </div>
-        </div>
-        <button class="btn btn-ghost btn-sm" onclick="dbPing().then(()=>toast('연결 확인 완료','success'))">ping</button>
-      </div>
-
       <div class="settings-item" onclick="dbSeedBenefits()">
         <div class="settings-item-left">
           <div class="settings-icon">📥</div>
-          <div>
-            <div class="settings-label">혜택 DB 시드</div>
-            <div class="settings-sub">로컬 혜택 데이터를 Supabase에 업로드</div>
-          </div>
+          <div><div class="settings-label">혜택 DB 시드</div><div class="settings-sub">데이터를 Supabase에 업로드</div></div>
         </div>
-        <span style="color:var(--text-dim)">→</span>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
-
       <div class="settings-item" onclick="showDbStats()">
         <div class="settings-item-left">
           <div class="settings-icon">📊</div>
           <div>
-            <div class="settings-label">DB 통계 확인</div>
-            <div class="settings-sub">사용자 수, 혜택 수, 뉴스 수</div>
+            <div class="settings-label">DB 통계</div>
+            <div class="settings-sub" id="db-status">확인 중...</div>
           </div>
         </div>
-        <span style="color:var(--text-dim)">→</span>
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();dbPing().then(()=>toast('연결 확인','success'))">ping</button>
       </div>
-
-      <!-- 관리자: 뉴스 등록 -->
-      <div style="margin-top:12px">
-        <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px">📝 뉴스 등록 (관리자)</div>
-        <div class="form-group">
-          <input class="form-input" id="admin-news-title" placeholder="뉴스 제목">
+      <div class="settings-item" onclick="confirmClearData()">
+        <div class="settings-item-left">
+          <div class="settings-icon">🗑</div>
+          <div><div class="settings-label" style="color:var(--danger)">데이터 초기화</div><div class="settings-sub">모든 설정 및 프로필 삭제</div></div>
         </div>
-        <div class="form-group">
-          <input class="form-input" id="admin-news-summary" placeholder="요약">
-        </div>
-        <div class="form-row">
-          <select class="form-select" id="admin-news-category">
-            <option value="">카테고리 선택</option>
-            ${Object.entries(BENEFIT_CATEGORIES).map(([id, c]) =>
-              `<option value="${id}">${c.label}</option>`).join('')}
-          </select>
-          <label class="checkbox-item" id="admin-news-urgent-wrap" style="margin-bottom:0">
-            <input type="checkbox" id="admin-news-urgent">
-            <span>🔴 긴급</span>
-          </label>
-        </div>
-        <input class="form-input mt8" id="admin-news-url" placeholder="원문 URL (선택)">
-        <button class="btn btn-primary btn-full mt8" onclick="submitAdminNews()">뉴스 등록하기</button>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>
 
-    <!-- 앱 정보 -->
-    <div class="card">
-      <div class="section-title" style="margin-bottom:14px">ℹ️ 앱 정보</div>
-      <div style="font-size:.85rem;color:var(--text-muted);line-height:1.8">
-        <div><strong>복지ON</strong> v1.0.0</div>
-        <div>NVIDIA AI 멀티에이전트 복지 혜택 플랫폼</div>
-        <div style="font-size:.78rem;color:var(--text-dim);margin-top:4px">
-          Supabase: jynktixmuhghhgayxrlv
-        </div>
-        <div style="margin-top:8px;font-size:.78rem;color:var(--text-dim)">
-          본 서비스는 참고용이며, 실제 수급 여부는 관할 기관에 확인하시기 바랍니다.
-        </div>
+    <!-- 뉴스 등록 -->
+    <div style="font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px">관리자 · 뉴스 등록</div>
+    <div class="card mb16">
+      <div class="form-group"><input class="form-input" id="admin-news-title" placeholder="뉴스 제목"></div>
+      <div class="form-group"><input class="form-input" id="admin-news-summary" placeholder="요약"></div>
+      <div class="form-row">
+        <select class="form-select" id="admin-news-category">
+          <option value="">카테고리 선택</option>
+          ${Object.entries(BENEFIT_CATEGORIES).map(([id, c]) =>
+            `<option value="${id}">${c.label}</option>`).join('')}
+        </select>
+        <label class="checkbox-item" id="admin-news-urgent-wrap">
+          <input type="checkbox" id="admin-news-urgent">
+          <div class="checkbox-check">✓</div>
+          <span>긴급</span>
+        </label>
       </div>
+      <input class="form-input mt8" id="admin-news-url" placeholder="원문 URL (선택)">
+      <button class="btn btn-primary btn-full mt12" onclick="submitAdminNews()">뉴스 등록</button>
+    </div>
+
+    <!-- 앱 정보 -->
+    <div class="card" style="text-align:center;padding:20px">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:4px">복지ON v1.0.0</div>
+      <div style="font-size:.78rem;color:var(--text-muted)">NVIDIA AI 멀티에이전트 복지 플랫폼</div>
+      <div style="font-size:.72rem;color:var(--text-dim);margin-top:12px;line-height:1.6">본 서비스는 참고용이며, 실제 수급 여부는<br>관할 기관에 확인하시기 바랍니다.</div>
     </div>
   `;
 
@@ -438,14 +402,15 @@ function toggleKeyVisibility(inputId, btn) {
 function saveApiKeys() {
   const nvidiaKey = document.getElementById('nvidia-key')?.value.trim() || '';
   const claudeKey = document.getElementById('claude-key')?.value.trim() || '';
-  saveSettings({ nvidiaKey, claudeKey });
+  const kosisKey = document.getElementById('kosis-key')?.value.trim() || '';
+  saveSettings({ nvidiaKey, claudeKey, kosisKey });
   toast('API 키가 저장되었습니다', 'success');
 }
 
 function exportData() {
   const data = {
     profile: APP.profile,
-    settings: { ...APP.settings, nvidiaKey: '***', claudeKey: '***' },
+    settings: { ...APP.settings, nvidiaKey: '***', claudeKey: '***', kosisKey: '***' },
     matchedBenefits: APP.matchedBenefits,
     exportedAt: new Date().toISOString(),
   };

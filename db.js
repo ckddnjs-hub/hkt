@@ -376,6 +376,73 @@ async function dbInit() {
   return true;
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  7. 생애계획 (정책 인사이트용 집계)
+// ════════════════════════════════════════════════════════════════════
+
+async function dbSaveLifePlan(plan, profile) {
+  if (!plan || !profile) return;
+  const sessionId = getSessionId();
+  const payload = {
+    session_id: sessionId,
+    plan_ids: Object.keys(plan),
+    plan_data: plan,
+    region: profile.region || null,
+    age_group: toAgeGroup(profile.age),
+    income_group: toIncomeGroup(profile.incomePercent),
+    saved_at: new Date().toISOString(),
+  };
+  try {
+    await sbRequest('life_plans', 'POST', payload,
+      'return=minimal,resolution=merge-duplicates');
+    console.log('[DB] 생애계획 저장 완료');
+  } catch (e) {
+    console.warn('[DB] 생애계획 저장 실패:', e.message);
+  }
+}
+
+async function dbFetchLifePlanStats() {
+  const rows = await sbRequest('life_plans?select=plan_ids,region,age_group&limit=1000');
+  if (!rows?.length) throw new Error('no data');
+
+  // 클라이언트 집계
+  const byPlan = {};
+  rows.forEach(r => {
+    (r.plan_ids || []).forEach(id => { byPlan[id] = (byPlan[id] || 0) + 1; });
+  });
+  const byRegionMap = {};
+  rows.forEach(r => {
+    if (r.region) byRegionMap[r.region] = (byRegionMap[r.region] || 0) + 1;
+  });
+
+  const optMap = {};
+  LIFE_PLAN_OPTIONS.forEach(o => { optMap[o.id] = o; });
+
+  const totalResponses = rows.length;
+  const by_plan = Object.entries(byPlan)
+    .map(([id, count]) => ({
+      id, count,
+      icon: optMap[id]?.icon || '📋',
+      label: optMap[id]?.label || id,
+      pct: parseFloat((count / totalResponses * 100).toFixed(1)),
+      top_timeframe: '집계 중',
+      gap: optMap[id]?.policyTag || '',
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const by_region = Object.entries(byRegionMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([region, count]) => ({ region, count, top_need: '집계 중' }));
+
+  return {
+    total_responses: totalResponses,
+    by_plan,
+    by_region,
+    policy_gaps: getMockPolicyStats().policy_gaps,
+  };
+}
+
 // ── DB 연동된 혜택 로드 (DB 우선, 실패 시 로컬 폴백) ──────────────────
 async function loadBenefitsWithDB(filterOpts = {}) {
   if (!SB.connected) return null;

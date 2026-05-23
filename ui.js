@@ -32,26 +32,30 @@ function hideLoading() {
   if (el) el.classList.add('hidden');
 }
 
-// ── 모달 ───────────────────────────────────────────────────────────
+// ── 모달 (overlay의 다음 형제 .modal을 자동으로 열기) ──────────────
 function openModal(overlayId) {
-  // overlayId가 overlay id면 overlay와 paired modal 모두 열기
   const overlay = document.getElementById(overlayId);
-  if (overlay) overlay.classList.add('open');
-  // paired modal: overlay id에서 '-overlay' 제거 후 '-modal' 붙이기
-  const modalId = overlayId.replace('-overlay', '-modal');
-  const modal = document.getElementById(modalId);
-  if (modal) modal.classList.add('open');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  // overlay 바로 다음 형제 요소(.modal)를 열기
+  const modal = overlay.nextElementSibling;
+  if (modal?.classList.contains('modal')) {
+    modal.classList.add('open');
+  }
+  document.body.style.overflow = 'hidden';
 }
 function closeModal(overlayId) {
   const overlay = document.getElementById(overlayId);
-  if (overlay) overlay.classList.remove('open');
-  const modalId = overlayId.replace('-overlay', '-modal');
-  const modal = document.getElementById(modalId);
-  if (modal) modal.classList.remove('open');
+  if (!overlay) return;
+  overlay.classList.remove('open');
+  const modal = overlay.nextElementSibling;
+  if (modal?.classList.contains('modal')) modal.classList.remove('open');
+  document.body.style.overflow = '';
 }
 function closeAllModals() {
   document.querySelectorAll('.modal-overlay.open').forEach(o => o.classList.remove('open'));
   document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
+  document.body.style.overflow = '';
 }
 
 // ── 아바타 ─────────────────────────────────────────────────────────

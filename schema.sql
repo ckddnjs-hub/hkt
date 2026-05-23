@@ -50,7 +50,29 @@ CREATE TABLE IF NOT EXISTS user_sessions (
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
--- ── 4. 혜택 통계 ─────────────────────────────────────────────────
+-- ── 4. 생애계획 (정책 인사이트용 집계) ───────────────────────────
+CREATE TABLE IF NOT EXISTS life_plans (
+  id           BIGSERIAL PRIMARY KEY,
+  session_id   TEXT NOT NULL,
+  plan_ids     TEXT[]   DEFAULT '{}',  -- 선택한 계획 ID 배열
+  plan_data    JSONB    DEFAULT '{}',  -- 세부 데이터 (시기, 자녀 수 등)
+  region       TEXT,
+  age_group    TEXT,
+  income_group TEXT,
+  saved_at     TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(session_id)  -- 1 세션당 1건 (upsert용)
+);
+
+CREATE INDEX IF NOT EXISTS idx_lifeplans_region   ON life_plans(region);
+CREATE INDEX IF NOT EXISTS idx_lifeplans_age      ON life_plans(age_group);
+CREATE INDEX IF NOT EXISTS idx_lifeplans_saved    ON life_plans(saved_at DESC);
+
+ALTER TABLE life_plans ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "생애계획_공개_읽기" ON life_plans FOR SELECT USING (true);
+CREATE POLICY "생애계획_공개_삽입" ON life_plans FOR INSERT WITH CHECK (true);
+CREATE POLICY "생애계획_공개_수정" ON life_plans FOR UPDATE USING (true);
+
+-- ── 6. 혜택 통계 ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS benefit_stats (
   benefit_id        TEXT PRIMARY KEY REFERENCES welfare_benefits(id) ON DELETE CASCADE,
   view_count        INT DEFAULT 0,

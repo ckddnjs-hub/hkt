@@ -4,7 +4,7 @@
 const APP = {
   currentPage: 'home',
   profile: null,
-  settings: { nvidiaKey: '', claudeKey: '', theme: 'dark', notifications: false },
+  settings: { nvidiaKey: '', claudeKey: '', kosisKey: '', theme: 'dark', notifications: false },
   matchedBenefits: [],
   isOnboarded: false,
 };
@@ -115,6 +115,7 @@ function showApp() {
   document.getElementById('loading-screen').classList.add('hidden');
   const appEl = document.getElementById('app');
   appEl.classList.add('show');
+  initRouter();
   renderSidebarUser();
   updateWelfareMiniScore();
   // 초기 페이지 렌더
@@ -124,7 +125,8 @@ function showApp() {
 // ── 페이지 타이틀 맵 ─────────────────────────────────────────────────
 const PAGE_TITLES = {
   home: '대시보드', profile: '내 정보', benefits: '맞춤 혜택',
-  news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드', settings: '설정',
+  news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드',
+  settings: '설정', chat: 'AI 복지 상담', voice: '복지 라디오',
 };
 
 // ── 라우터 ──────────────────────────────────────────────────────────
@@ -159,7 +161,7 @@ function navigateTo(page, pushState = true, isBack = false) {
   APP.currentPage = page;
 
   // 페이지 순서로 슬라이드 방향 결정
-  const pageOrder = ['home', 'profile', 'benefits', 'news', 'lifecycle', 'apply', 'settings'];
+  const pageOrder = ['home', 'profile', 'benefits', 'chat', 'voice', 'news', 'lifecycle', 'apply', 'settings'];
   const prevIdx = pageOrder.indexOf(prevPage);
   const nextIdx = pageOrder.indexOf(page);
   const goingBack = isBack || (prevIdx > nextIdx);
@@ -202,6 +204,11 @@ function navigateTo(page, pushState = true, isBack = false) {
   // 스크롤 상단 (앱 바디)
   document.querySelector('.app-body')?.scrollTo(0, 0);
 
+  // 음성 페이지 이탈 시 정지
+  if (prevPage === 'voice' && page !== 'voice') {
+    if (typeof onVoicePageLeave === 'function') onVoicePageLeave();
+  }
+
   // 페이지별 초기화
   onPageEnter(page);
 }
@@ -215,6 +222,8 @@ function onPageEnter(page) {
     case 'apply': renderApplyPage(); break;
     case 'profile': renderProfilePage(); break;
     case 'settings': renderSettingsPage(); break;
+    case 'chat': renderChatPage(); break;
+    case 'voice': renderVoicePage(); break;
   }
 }
 
