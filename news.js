@@ -3,12 +3,22 @@
 let newsFilter = 'all';
 
 // ── 뉴스 페이지 렌더링 ───────────────────────────────────────────────
-function renderNewsPage() {
+async function renderNewsPage() {
   const page = document.getElementById('page-news');
   if (!page) return;
 
+  // DB에서 뉴스 로드 (연결 시)
+  if (SB.connected) {
+    const dbNews = await loadNewsWithDB();
+    if (dbNews?.length) {
+      // SAMPLE_NEWS를 DB 데이터로 교체 (전역 덮어쓰기 없이 지역 변수 사용)
+      window._liveNews = dbNews;
+    }
+  }
+
+  const liveNews = window._liveNews || SAMPLE_NEWS;
   const profileCategories = getProfileCategories();
-  const filteredNews = getPersonalizedNews(profileCategories);
+  const filteredNews = getPersonalizedNews(profileCategories, liveNews);
 
   page.innerHTML = `
     <div class="page-title">복지 뉴스</div>
@@ -112,10 +122,11 @@ function getProfileCategories() {
 }
 
 // ── 개인화 뉴스 정렬 ────────────────────────────────────────────────
-function getPersonalizedNews(profileCategories) {
-  if (!profileCategories.length) return SAMPLE_NEWS;
+function getPersonalizedNews(profileCategories, source) {
+  const news = source || window._liveNews || SAMPLE_NEWS;
+  if (!profileCategories.length) return news;
 
-  return [...SAMPLE_NEWS].sort((a, b) => {
+  return [...news].sort((a, b) => {
     const aMatch = profileCategories.includes(a.category) ? 1 : 0;
     const bMatch = profileCategories.includes(b.category) ? 1 : 0;
     if (bMatch !== aMatch) return bMatch - aMatch;

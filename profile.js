@@ -274,7 +274,7 @@ function readProfileFromForm() {
 }
 
 // ── 프로필 저장 ─────────────────────────────────────────────────────
-function saveProfileFromForm() {
+async function saveProfileFromForm() {
   const profile = readProfileFromForm();
 
   if (!profile.name || !profile.age) {
@@ -291,6 +291,8 @@ function saveProfileFromForm() {
   renderSidebarUser();
 
   toast(`${profile.name}님, 프로필이 저장되었습니다! ${matched.length}개 혜택을 찾았어요.`, 'success', 4000);
-
   document.getElementById('btn-find-benefits')?.style.removeProperty('display');
+
+  // Supabase 동기화 (비동기 - 실패해도 로컬 저장 유지)
+  dbSaveProfile(profile).catch(() => {});
 }

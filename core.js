@@ -28,14 +28,14 @@ async function bootApp() {
     }
   }
 
-  // 저장된 데이터 로드
+  // 저장된 데이터 로드 (로컬)
   loadPersistedData();
 
   // 테마 적용
   applyTheme(APP.settings.theme);
 
-  // 라우팅 초기화
-  initRouter();
+  // body 표시 (UI 먼저 렌더)
+  document.body.classList.add('ready');
 
   // 온보딩 여부 확인
   if (!APP.isOnboarded || !APP.profile) {
@@ -44,9 +44,17 @@ async function bootApp() {
     showApp();
   }
 
-  // body 표시
-  document.body.classList.add('ready');
   hideLoading();
+
+  // Supabase 비동기 초기화 (UI 블로킹 없음)
+  dbInit().then(connected => {
+    if (connected) {
+      console.log('[App] Supabase 연결 완료');
+      // 원격 프로필 로드 후 UI 업데이트
+      renderSidebarUser();
+      updateWelfareMiniScore();
+    }
+  });
 }
 
 // ── 데이터 로드 ──────────────────────────────────────────────────────

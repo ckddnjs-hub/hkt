@@ -130,6 +130,11 @@ function filterBenefits(filter, btn) {
 
 // ── 혜택 상세 모달 ───────────────────────────────────────────────────
 function openBenefitDetail(benefitId) {
+  // 조회수 통계 기록 (비동기, 조용히)
+  if (typeof dbTrackBenefitView === 'function') {
+    dbTrackBenefitView(benefitId).catch(() => {});
+  }
+
   const benefit = WELFARE_DB.find(b => b.id === benefitId);
   if (!benefit) return;
 

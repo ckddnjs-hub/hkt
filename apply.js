@@ -344,18 +344,86 @@ function renderSettingsPage() {
       </div>
     </div>
 
+    <!-- Supabase DB 상태 -->
+    <div class="card mb16">
+      <div class="section-title" style="margin-bottom:14px">🗄️ 데이터베이스</div>
+
+      <div class="settings-item" style="cursor:default">
+        <div class="settings-item-left">
+          <div class="settings-icon">🟢</div>
+          <div>
+            <div class="settings-label">Supabase 연결</div>
+            <div class="settings-sub" id="db-status">확인 중...</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="dbPing().then(()=>toast('연결 확인 완료','success'))">ping</button>
+      </div>
+
+      <div class="settings-item" onclick="dbSeedBenefits()">
+        <div class="settings-item-left">
+          <div class="settings-icon">📥</div>
+          <div>
+            <div class="settings-label">혜택 DB 시드</div>
+            <div class="settings-sub">로컬 혜택 데이터를 Supabase에 업로드</div>
+          </div>
+        </div>
+        <span style="color:var(--text-dim)">→</span>
+      </div>
+
+      <div class="settings-item" onclick="showDbStats()">
+        <div class="settings-item-left">
+          <div class="settings-icon">📊</div>
+          <div>
+            <div class="settings-label">DB 통계 확인</div>
+            <div class="settings-sub">사용자 수, 혜택 수, 뉴스 수</div>
+          </div>
+        </div>
+        <span style="color:var(--text-dim)">→</span>
+      </div>
+
+      <!-- 관리자: 뉴스 등록 -->
+      <div style="margin-top:12px">
+        <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:8px">📝 뉴스 등록 (관리자)</div>
+        <div class="form-group">
+          <input class="form-input" id="admin-news-title" placeholder="뉴스 제목">
+        </div>
+        <div class="form-group">
+          <input class="form-input" id="admin-news-summary" placeholder="요약">
+        </div>
+        <div class="form-row">
+          <select class="form-select" id="admin-news-category">
+            <option value="">카테고리 선택</option>
+            ${Object.entries(BENEFIT_CATEGORIES).map(([id, c]) =>
+              `<option value="${id}">${c.label}</option>`).join('')}
+          </select>
+          <label class="checkbox-item" id="admin-news-urgent-wrap" style="margin-bottom:0">
+            <input type="checkbox" id="admin-news-urgent">
+            <span>🔴 긴급</span>
+          </label>
+        </div>
+        <input class="form-input mt8" id="admin-news-url" placeholder="원문 URL (선택)">
+        <button class="btn btn-primary btn-full mt8" onclick="submitAdminNews()">뉴스 등록하기</button>
+      </div>
+    </div>
+
     <!-- 앱 정보 -->
     <div class="card">
       <div class="section-title" style="margin-bottom:14px">ℹ️ 앱 정보</div>
       <div style="font-size:.85rem;color:var(--text-muted);line-height:1.8">
         <div><strong>복지ON</strong> v1.0.0</div>
         <div>NVIDIA AI 멀티에이전트 복지 혜택 플랫폼</div>
+        <div style="font-size:.78rem;color:var(--text-dim);margin-top:4px">
+          Supabase: jynktixmuhghhgayxrlv
+        </div>
         <div style="margin-top:8px;font-size:.78rem;color:var(--text-dim)">
           본 서비스는 참고용이며, 실제 수급 여부는 관할 기관에 확인하시기 바랍니다.
         </div>
       </div>
     </div>
   `;
+
+  // 설정 페이지 렌더 후 DB 상태 바로 표시
+  setTimeout(() => updateDbStatusUI(SB.connected), 100);
 }
 
 // ── 설정 기능들 ─────────────────────────────────────────────────────
@@ -394,6 +462,54 @@ function exportData() {
 function confirmClearData() {
   if (confirm('모든 데이터를 초기화하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
     Object.values(LS).forEach(key => localStorage.removeItem(key));
+    localStorage.removeItem('bokjion_session_id');
+    localStorage.removeItem('bokjion_db_seeded');
     location.reload();
+  }
+}
+
+// ── DB 통계 표시 ─────────────────────────────────────────────────────
+async function showDbStats() {
+  if (!SB.connected) {
+    toast('Supabase에 연결되어 있지 않습니다', 'warn');
+    return;
+  }
+  toast('통계 조회 중...', 'info', 1500);
+  const stats = await dbFetchStats();
+  const popular = await dbFetchPopularBenefits(3);
+  const popularText = popular.length
+    ? popular.map((s, i) => `${i + 1}. ${s.benefit_id} (${s.view_count}회)`).join('\n')
+    : '데이터 없음';
+
+  alert(`📊 복지ON DB 통계\n\n👥 세션(사용자): ${stats.users}명\n🎁 활성 혜택: ${stats.benefits}개\n📰 뉴스: ${stats.news}개\n\n🔥 인기 혜택:\n${popularText}`);
+}
+
+// ── 관리자 뉴스 등록 제출 ─────────────────────────────────────────────
+async function submitAdminNews() {
+  const title   = document.getElementById('admin-news-title')?.value.trim();
+  const summary = document.getElementById('admin-news-summary')?.value.trim();
+  const category = document.getElementById('admin-news-category')?.value;
+  const urgent  = document.getElementById('admin-news-urgent')?.checked;
+  const url     = document.getElementById('admin-news-url')?.value.trim();
+
+  if (!title || !summary) {
+    toast('제목과 요약은 필수입니다', 'warn');
+    return;
+  }
+  if (!SB.connected) {
+    toast('DB 연결이 필요합니다', 'warn');
+    return;
+  }
+
+  const result = await dbAddNews({ title, summary, category, urgent, url });
+  if (result) {
+    // 입력 초기화
+    ['admin-news-title', 'admin-news-summary', 'admin-news-url'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    document.getElementById('admin-news-category').value = '';
+    // 라이브 뉴스 캐시 초기화 → 다음 뉴스 페이지 방문 시 재로드
+    window._liveNews = null;
   }
 }
