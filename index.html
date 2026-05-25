@@ -39,10 +39,10 @@
       <div class="ob-sub">NVIDIA AI 멀티에이전트가<br>나에게 맞는 복지 혜택을 찾아드립니다</div>
     </div>
     <div class="ob-features">
-      <div class="ob-feature"><div class="ob-feature-icon">🎯</div><div class="ob-feature-label">맞춤 혜택 매칭</div></div>
-      <div class="ob-feature"><div class="ob-feature-icon">🤖</div><div class="ob-feature-label">AI 멀티에이전트</div></div>
-      <div class="ob-feature"><div class="ob-feature-icon">🔮</div><div class="ob-feature-label">생애주기 플랜</div></div>
-      <div class="ob-feature"><div class="ob-feature-icon">👥</div><div class="ob-feature-label">유사계층 분석</div></div>
+      <div class="ob-feature"><div class="ob-feature-icon">📣</div><div class="ob-feature-label">AI 마을방송</div></div>
+      <div class="ob-feature"><div class="ob-feature-icon">🎤</div><div class="ob-feature-label">음성 상담</div></div>
+      <div class="ob-feature"><div class="ob-feature-icon">🎯</div><div class="ob-feature-label">맞춤 혜택</div></div>
+      <div class="ob-feature"><div class="ob-feature-icon">📞</div><div class="ob-feature-label">전화 발송</div></div>
     </div>
     <button class="btn-start" onclick="startApp()">시작하기 →</button>
     <div style="margin-top:12px;font-size:.78rem;color:var(--text-dim);text-align:center">개인정보는 기기에만 저장됩니다</div>
@@ -87,7 +87,7 @@
           <span class="nav-icon">💬</span><span>AI 상담</span>
         </button>
         <button class="nav-item" data-page="voice">
-          <span class="nav-icon">📻</span><span>복지 라디오</span>
+          <span class="nav-icon">📣</span><span>AI 마을방송</span>
         </button>
         <button class="nav-item" data-page="lifecycle">
           <span class="nav-icon">🔮</span><span>생애 계획</span>
@@ -100,6 +100,9 @@
         <div class="nav-section-label">도구</div>
         <button class="nav-item" data-page="apply">
           <span class="nav-icon">📋</span><span>신청 가이드</span>
+        </button>
+        <button class="nav-item" data-page="admin">
+          <span class="nav-icon">🏛️</span><span>사각지대 발굴</span>
         </button>
         <button class="nav-item" data-page="settings">
           <span class="nav-icon">⚙️</span><span>설정</span>
@@ -158,6 +161,7 @@
       <div class="page" id="page-settings"></div>
       <div class="page" id="page-chat"></div>
       <div class="page" id="page-voice"></div>
+      <div class="page" id="page-admin"></div>
 
     </div><!-- /app-body -->
 
@@ -204,29 +208,28 @@
       <span>AI상담</span>
     </button>
 
-    <!-- 복지 라디오 -->
+    <!-- AI 마을방송 -->
     <button class="bottom-nav-item" data-nav="voice">
       <div class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-          <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
-          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+          <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+          <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
         </svg>
       </div>
-      <span>라디오</span>
+      <span>마을방송</span>
     </button>
 
-    <!-- 뉴스 -->
-    <button class="bottom-nav-item" data-nav="news">
+    <!-- 사각지대 발굴 -->
+    <button class="bottom-nav-item" data-nav="admin">
       <div class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/>
-          <line x1="16" y1="13" x2="8" y2="13"/>
-          <line x1="16" y1="17" x2="8" y2="17"/>
-          <line x1="10" y1="9" x2="8" y2="9"/>
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <line x1="11" y1="8" x2="11" y2="14"/>
+          <line x1="8" y1="11" x2="14" y2="11"/>
         </svg>
       </div>
-      <span>뉴스</span>
+      <span>발굴</span>
     </button>
 
   </nav><!-- /bottom-nav -->
@@ -262,6 +265,7 @@
 <script src="apply.js"></script>
 <script src="chat.js"></script>
 <script src="voice.js"></script>
+<script src="admin.js"></script>
 <script src="core.js"></script>
 
 <script>

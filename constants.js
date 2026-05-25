@@ -336,3 +336,123 @@ const REGIONS = [
   '서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종',
   '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'
 ];
+
+// ── 지역별 사각지대 추정 데이터 (KOSIS 기반 2024년 추정치) ───────────────
+const BLIND_SPOT_DATA = {
+  '서울': { pop65: 1580000, singleElderly: 312000, basicPension: { recipients: 875000, eligible: 1106000 }, housing: { recipients: 178000, eligible: 295000 }, disability: { recipients: 43000, eligible: 61000 } },
+  '부산': { pop65: 430000, singleElderly: 89000, basicPension: { recipients: 248000, eligible: 301000 }, housing: { recipients: 63000, eligible: 97000 }, disability: { recipients: 17000, eligible: 24000 } },
+  '대구': { pop65: 290000, singleElderly: 58000, basicPension: { recipients: 168000, eligible: 203000 }, housing: { recipients: 44000, eligible: 68000 }, disability: { recipients: 12000, eligible: 17000 } },
+  '인천': { pop65: 310000, singleElderly: 59000, basicPension: { recipients: 178000, eligible: 217000 }, housing: { recipients: 47000, eligible: 73000 }, disability: { recipients: 13000, eligible: 18000 } },
+  '광주': { pop65: 165000, singleElderly: 34000, basicPension: { recipients: 97000, eligible: 115500 }, housing: { recipients: 27000, eligible: 42000 }, disability: { recipients: 8000, eligible: 11000 } },
+  '대전': { pop65: 162000, singleElderly: 31000, basicPension: { recipients: 94000, eligible: 113400 }, housing: { recipients: 26000, eligible: 40000 }, disability: { recipients: 7500, eligible: 10500 } },
+  '울산': { pop65: 115000, singleElderly: 21000, basicPension: { recipients: 64000, eligible: 80500 }, housing: { recipients: 18000, eligible: 28000 }, disability: { recipients: 5200, eligible: 7300 } },
+  '세종': { pop65: 38000, singleElderly: 6500, basicPension: { recipients: 21000, eligible: 26600 }, housing: { recipients: 6000, eligible: 9200 }, disability: { recipients: 1700, eligible: 2400 } },
+  '경기': { pop65: 1420000, singleElderly: 268000, basicPension: { recipients: 782000, eligible: 994000 }, housing: { recipients: 163000, eligible: 272000 }, disability: { recipients: 39000, eligible: 55000 } },
+  '강원': { pop65: 248000, singleElderly: 56000, basicPension: { recipients: 158000, eligible: 173600 }, housing: { recipients: 42000, eligible: 62000 }, disability: { recipients: 11000, eligible: 15000 } },
+  '충북': { pop65: 218000, singleElderly: 48000, basicPension: { recipients: 138000, eligible: 152600 }, housing: { recipients: 37000, eligible: 55000 }, disability: { recipients: 9500, eligible: 13200 } },
+  '충남': { pop65: 268000, singleElderly: 61000, basicPension: { recipients: 167000, eligible: 187600 }, housing: { recipients: 45000, eligible: 67000 }, disability: { recipients: 11500, eligible: 16000 } },
+  '전북': { pop65: 268000, singleElderly: 62000, basicPension: { recipients: 175000, eligible: 187600 }, housing: { recipients: 48000, eligible: 68000 }, disability: { recipients: 12000, eligible: 16500 } },
+  '전남': { pop65: 298000, singleElderly: 72000, basicPension: { recipients: 197000, eligible: 208600 }, housing: { recipients: 54000, eligible: 75000 }, disability: { recipients: 13500, eligible: 18500 } },
+  '경북': { pop65: 368000, singleElderly: 85000, basicPension: { recipients: 238000, eligible: 257600 }, housing: { recipients: 63000, eligible: 90000 }, disability: { recipients: 16500, eligible: 23000 } },
+  '경남': { pop65: 355000, singleElderly: 76000, basicPension: { recipients: 228000, eligible: 248500 }, housing: { recipients: 61000, eligible: 87000 }, disability: { recipients: 16000, eligible: 22000 } },
+  '제주': { pop65: 102000, singleElderly: 20000, basicPension: { recipients: 62000, eligible: 71400 }, housing: { recipients: 17000, eligible: 26000 }, disability: { recipients: 4400, eligible: 6100 } },
+};
+
+// ── 우선 발굴 대상 데모 (익명화) ─────────────────────────────────────
+const PRIORITY_TARGETS_DEMO = [
+  { id: 1, code: 'HH-001', age: 82, type: '독거노인', neighborhood: '중앙동', missing: ['기초연금', '에너지바우처'], risk: 'high', contactDays: 45 },
+  { id: 2, code: 'HH-002', age: 74, type: '독거노인', neighborhood: '행복동', missing: ['장기요양보험'], risk: 'high', contactDays: 31 },
+  { id: 3, code: 'HH-003', age: 68, type: '중증장애', neighborhood: '평화동', missing: ['장애인연금', '활동지원'], risk: 'high', contactDays: 7 },
+  { id: 4, code: 'HH-004', age: 79, type: '독거노인', neighborhood: '중앙동', missing: ['기초연금', '의료급여'], risk: 'high', contactDays: 60 },
+  { id: 5, code: 'HH-005', age: 71, type: '독거노인', neighborhood: '희망동', missing: ['주거급여'], risk: 'medium', contactDays: 21 },
+  { id: 6, code: 'HH-006', age: 35, type: '한부모', neighborhood: '행복동', missing: ['한부모가족지원', '아동양육비'], risk: 'medium', contactDays: 3 },
+  { id: 7, code: 'HH-007', age: 55, type: '중증장애', neighborhood: '평화동', missing: ['활동지원서비스'], risk: 'medium', contactDays: 14 },
+  { id: 8, code: 'HH-008', age: 88, type: '독거노인', neighborhood: '중앙동', missing: ['기초연금', '노인돌봄'], risk: 'high', contactDays: 90 },
+];
+
+// ── 이달 마감 혜택 ────────────────────────────────────────────────────
+const DEADLINE_BENEFITS = [
+  { name: '에너지바우처', deadline: '2024-12-31', dday: 7, category: 'income', desc: '동절기 에너지 지원 · 최대 연 18만원' },
+  { name: '청년 월세 지원', deadline: '2025-01-15', dday: 22, category: 'housing', desc: '월 최대 20만원 × 12개월' },
+  { name: '아동수당 신청', deadline: '상시', dday: null, category: 'family', desc: '출생 후 60일 내 신청 권장' },
+  { name: '긴급복지지원', deadline: '상시', dday: null, category: 'income', desc: '위기상황 발생 시 즉시 신청' },
+];
+
+// ── 방송 카테고리 ─────────────────────────────────────────────────────
+const BROADCAST_CATEGORIES = [
+  { id: 'welfare',  label: '복지 혜택', icon: '🎁', color: '#3B82F6', urgency: 'normal' },
+  { id: 'disaster', label: '재난·안전', icon: '🚨', color: '#EF4444', urgency: 'high'   },
+  { id: 'health',   label: '건강·의료', icon: '💉', color: '#10B981', urgency: 'normal' },
+  { id: 'weather',  label: '기상 특보', icon: '🌪️', color: '#F59E0B', urgency: 'high'   },
+  { id: 'life',     label: '생활 안내', icon: '🏘️', color: '#8B5CF6', urgency: 'normal' },
+  { id: 'agri',     label: '농어업',   icon: '🌾', color: '#84CC16', urgency: 'normal' },
+];
+
+// ── 카테고리별 방송 템플릿 ─────────────────────────────────────────────
+const BROADCAST_TEMPLATES = {
+  welfare: [
+    { id: 'n_pension', label: '기초연금 신청',
+      official: '기초연금 신청 기간이 도래하였으니 만 65세 이상 어르신께서는 해당 읍면동 주민센터에 내방하시어 신청 절차를 이행하시기 바랍니다. 신청 시 신분증 및 통장사본을 지참하시기 바랍니다.' },
+    { id: 'n_rent', label: '청년 월세 지원',
+      official: '2024년도 청년 월세 한시 특별지원 사업 신청을 실시합니다. 지원 대상은 만 19세에서 34세 이하 무주택 청년으로 월세 계약자이며, 가구 소득이 기준 중위소득 60% 이하인 자에 한합니다.' },
+    { id: 'n_energy', label: '에너지바우처',
+      official: '에너지바우처 지원 대상자를 대상으로 동절기 에너지바우처를 지급합니다. 대상자 여부는 읍면동 주민센터에 문의하시기 바랍니다.' },
+    { id: 'n_urgent', label: '긴급복지지원',
+      official: '갑작스러운 위기상황으로 생계유지가 곤란한 가구를 대상으로 긴급복지지원 사업을 실시합니다. 실직, 질병, 화재 등 위기상황 발생 시 읍면동 주민센터 또는 긴급복지지원 콜센터(129)에 신청하시기 바랍니다.' },
+  ],
+  disaster: [
+    { id: 'd_heatwave', label: '폭염 대피',
+      official: '폭염특보 발효로 인한 야외 활동 자제 및 온열질환 예방을 위해 취약계층 어르신 및 독거세대에 대한 안전 여부를 확인하고 무더위쉼터 이용을 적극 권장하오니 협조하여 주시기 바랍니다.' },
+    { id: 'd_typhoon', label: '태풍 주의',
+      official: '태풍 북상으로 인해 강풍 및 집중호우가 예상됩니다. 저지대·하천변 거주자는 사전 대피하시고, 외출을 자제하며 창문 및 출입문을 잠그고 시설물 결박 조치를 취하여 주시기 바랍니다.' },
+    { id: 'd_cold', label: '한파 주의',
+      official: '한파특보 발효로 기온이 급격히 하락할 예정입니다. 독거 어르신 및 취약계층 방한 대책을 강구하고, 수도 동파 방지 조치 및 보일러 점검을 실시하여 주시기 바랍니다.' },
+    { id: 'd_flood', label: '홍수·침수',
+      official: '집중호우로 인한 침수 피해가 예상됩니다. 하천변, 저지대, 지하 거주자는 즉시 안전한 지역으로 대피하시고, 침수 발생 시 119 또는 읍면동 행정복지센터에 신고하여 주시기 바랍니다.' },
+    { id: 'd_fire', label: '산불 주의',
+      official: '건조한 날씨와 강한 바람으로 산불 발생 위험이 높습니다. 산림 내 불씨 취급에 주의하시고 산림 인근 소각 행위를 전면 자제하여 주시기 바랍니다. 산불 발견 시 즉시 119에 신고하시기 바랍니다.' },
+  ],
+  health: [
+    { id: 'h_flu', label: '독감 예방접종',
+      official: '인플루엔자(독감) 국가 예방접종 사업이 시행됩니다. 만 65세 이상 어르신 및 생후 6개월부터 13세 이하 어린이는 지정 의료기관에서 무료로 접종받으실 수 있습니다. 접종 시 신분증을 지참하시기 바랍니다.' },
+    { id: 'h_covid', label: '감염병 주의',
+      official: '호흡기 감염병 확산 방지를 위하여 발열, 기침 등 증상 발생 시 외출을 자제하고 마스크를 착용하여 주시기 바랍니다. 증상이 지속될 경우 관할 보건소 또는 의료기관을 방문하여 주시기 바랍니다.' },
+    { id: 'h_check', label: '건강검진 안내',
+      official: '국가 일반건강검진 대상자는 검진 기한 내에 가까운 검진 기관에서 검진을 받으시기 바랍니다. 검진 대상 여부 및 기관은 국민건강보험공단(1577-1000)에 문의하시기 바랍니다.' },
+    { id: 'h_shelter', label: '무더위쉼터',
+      official: '폭염으로 인한 온열질환 예방을 위해 마을회관, 경로당 등 무더위쉼터를 운영합니다. 혼자 거주하시는 어르신 및 취약계층 주민께서는 쉼터를 적극 이용하시기 바랍니다.' },
+  ],
+  weather: [
+    { id: 'w_heat', label: '폭염 특보',
+      official: '오늘 최고 기온 35도 이상의 폭염이 예상됩니다. 낮 12시부터 오후 5시 사이 야외 활동을 자제하시고 충분한 수분을 섭취하여 주시기 바랍니다. 어지러움, 두통 등 이상 증상 발생 시 즉시 119에 신고하시기 바랍니다.' },
+    { id: 'w_rain', label: '집중호우',
+      official: '강한 비와 천둥·번개가 예상됩니다. 하천변, 저지대, 산사태 위험 지역 주민은 사전 대피하시고 외출을 자제하여 주시기 바랍니다. 피해 발생 시 즉시 119에 신고하여 주시기 바랍니다.' },
+    { id: 'w_snow', label: '대설 특보',
+      official: '대설특보 발효로 많은 눈이 예상됩니다. 빙판길 낙상 사고에 주의하시고, 농업시설 등 시설물 피해 예방 조치를 취하여 주시기 바랍니다. 불필요한 외출을 자제하여 주시기 바랍니다.' },
+    { id: 'w_dust', label: '미세먼지',
+      official: '미세먼지 농도가 매우 나쁨 수준으로 예상됩니다. 외출 시 마스크를 반드시 착용하시고, 노인, 어린이, 호흡기 및 심혈관 질환자는 외출을 최대한 자제하여 주시기 바랍니다.' },
+  ],
+  life: [
+    { id: 'l_water', label: '단수 안내',
+      official: '상수도 시설 정기 점검 공사로 인해 해당 지역에 단수가 예정되어 있습니다. 단수 시간 동안 불편함이 없도록 사전에 생활용수를 충분히 확보하여 주시기 바랍니다.' },
+    { id: 'l_power', label: '정전 안내',
+      official: '전력 설비 보수공사로 인해 해당 지역에 일시적인 정전이 예정되어 있습니다. 의료기기 사용 가정 및 냉동식품 보관 가정에서는 사전에 필요한 조치를 취하여 주시기 바랍니다.' },
+    { id: 'l_trash', label: '쓰레기 수거',
+      official: '대형폐기물 및 재활용품 특별 수거를 실시합니다. 배출 방법 및 수거 일정에 따라 지정된 장소에 배출하여 주시기 바랍니다.' },
+    { id: 'l_event', label: '마을 행사',
+      official: '주민 화합 및 지역 공동체 활성화를 위한 마을 행사가 개최됩니다. 주민 여러분의 많은 참여와 성원을 부탁드립니다.' },
+  ],
+  agri: [
+    { id: 'a_spray', label: '농약 살포',
+      official: '병해충 방제를 위한 공동 항공 방제(농약 살포)가 실시될 예정입니다. 해당 일시에는 인근 지역 야외 활동을 자제하시고, 창문을 닫아 주시기 바랍니다.' },
+    { id: 'a_harvest', label: '공동 수확',
+      official: '공동 수확 작업을 시행합니다. 참여를 희망하시는 분은 읍면동 행정복지센터에 사전 신청하여 주시기 바랍니다. 참여자 여비 및 식사는 제공됩니다.' },
+    { id: 'a_machine', label: '농기계 대여',
+      official: '농기계 임대사업소에서 트랙터, 이앙기 등 농기계를 저렴하게 대여합니다. 이용을 희망하시는 분은 농업기술센터에 사전 예약하여 주시기 바랍니다.' },
+    { id: 'a_fish', label: '어업 안전',
+      official: '기상 악화로 인해 출어를 자제하여 주시기 바랍니다. 부득이하게 출어 시 구명조끼를 반드시 착용하고 기상 상황을 수시로 확인하여 안전에 유의하여 주시기 바랍니다.' },
+  ],
+};
+
+// ── 하위 호환용 SAMPLE_NOTICES ────────────────────────────────────────
+const SAMPLE_NOTICES = BROADCAST_TEMPLATES.welfare;

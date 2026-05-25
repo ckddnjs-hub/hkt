@@ -5,6 +5,8 @@ const Chat = {
   messages: [],        // { role:'user'|'assistant', content, time, cards? }
   isTyping: false,
   sessionCtx: null,    // 빌드된 컨텍스트 캐시
+  stt: null,
+  isListening: false,
 };
 
 // ── 채팅 페이지 렌더링 ─────────────────────────────────────────────
@@ -48,11 +50,19 @@ function renderChatPage() {
           <textarea
             id="chat-input"
             class="chat-input"
-            placeholder="복지 혜택에 대해 무엇이든 물어보세요..."
+            placeholder="복지 혜택에 대해 물어보세요... (🎤 마이크로 말해도 됩니다)"
             rows="1"
             onkeydown="handleChatKey(event)"
             oninput="autoResizeTextarea(this)"
           ></textarea>
+          <button class="chat-mic-btn" id="chat-mic-btn" onclick="toggleMicInput()" title="음성으로 말하기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </button>
           <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"/>
@@ -60,7 +70,7 @@ function renderChatPage() {
             </svg>
           </button>
         </div>
-        <div class="chat-input-hint">NVIDIA AI가 실시간으로 복지 혜택을 분석합니다</div>
+        <div class="chat-input-hint">🎤 음성 입력 가능 · NVIDIA AI 복지 상담</div>
       </div>
     </div>
   `;
@@ -400,4 +410,60 @@ function toAgeGroup(age) {
   if (n < 50) return '40대';
   if (n < 65) return '50-64세';
   return '65세이상';
+}
+
+// ── 음성 입력 (STT) ──────────────────────────────────────────────────
+function toggleMicInput() {
+  if (Chat.isListening) {
+    stopMicInput();
+  } else {
+    startMicInput();
+  }
+}
+
+function startMicInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    toast('이 브라우저는 음성 입력을 지원하지 않습니다', 'warn');
+    return;
+  }
+
+  Chat.stt = new SpeechRecognition();
+  Chat.stt.lang = 'ko-KR';
+  Chat.stt.continuous = false;
+  Chat.stt.interimResults = true;
+
+  Chat.stt.onstart = () => {
+    Chat.isListening = true;
+    document.getElementById('chat-mic-btn')?.classList.add('listening');
+    toast('🎤 말씀해주세요...', 'info', 3000);
+  };
+
+  Chat.stt.onresult = (e) => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    const input = document.getElementById('chat-input');
+    if (input) { input.value = transcript; autoResizeTextarea(input); }
+  };
+
+  Chat.stt.onend = () => {
+    Chat.isListening = false;
+    document.getElementById('chat-mic-btn')?.classList.remove('listening');
+    const input = document.getElementById('chat-input');
+    if (input?.value.trim()) setTimeout(() => sendChatMessage(), 300);
+  };
+
+  Chat.stt.onerror = (e) => {
+    Chat.isListening = false;
+    document.getElementById('chat-mic-btn')?.classList.remove('listening');
+    if (e.error !== 'no-speech') toast('음성 인식 오류: ' + e.error, 'warn');
+  };
+
+  Chat.stt.start();
+}
+
+function stopMicInput() {
+  Chat.stt?.stop();
+  Chat.stt = null;
+  Chat.isListening = false;
+  document.getElementById('chat-mic-btn')?.classList.remove('listening');
 }
