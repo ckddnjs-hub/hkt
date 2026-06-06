@@ -8,62 +8,50 @@ function renderProfilePage() {
 
   page.innerHTML = `
     <div class="page-title">내 정보</div>
-    <div class="page-sub">맞춤 복지 혜택을 위해 정보를 입력해주세요</div>
+    <div class="page-sub">나이와 지역만 입력해도 바로 조회됩니다</div>
 
-    <!-- 완성도 표시 -->
-    <div class="profile-complete-bar" id="profile-complete-bar">
-      <div class="pcb-label">
-        <span>프로필 완성도</span>
-        <span class="pcb-pct" id="profile-pct">0%</span>
-      </div>
-      ${uiProgressBar(0, 100, 'var(--primary)')}
-    </div>
-
-    <!-- 기본 정보 -->
-    <div class="profile-section">
-      <div class="profile-section-title">기본 정보</div>
+    <!-- ── 필수: 나이 + 지역 ── -->
+    <div class="profile-section" style="border:2px solid var(--primary);border-radius:var(--radius)">
+      <div class="profile-section-title" style="color:var(--primary)">기본 정보 <span style="font-size:.72rem;font-weight:400;color:var(--text-muted)">— 이것만 입력해도 조회됩니다</span></div>
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">이름</label>
-          <input class="form-input" id="pf-name" type="text" placeholder="홍길동" value="${esc(p.name || '')}">
-        </div>
-        <div class="form-group">
-          <label class="form-label">나이</label>
+          <label class="form-label">나이 <span style="color:var(--primary);font-size:.7rem">필수</span></label>
           <input class="form-input" id="pf-age" type="number" min="1" max="100" placeholder="30" value="${esc(p.age || '')}">
         </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">성별</label>
-        <div class="toggle-group" id="pf-gender-group">
-          ${['male:남성', 'female:여성', 'other:기타'].map(g => {
-            const [val, label] = g.split(':');
-            return `<button class="toggle-btn ${p.gender === val ? 'active' : ''}" data-gender="${val}">${label}</button>`;
-          }).join('')}
+        <div class="form-group">
+          <label class="form-label">거주 지역 <span style="color:var(--primary);font-size:.7rem">필수</span></label>
+          <select class="form-select" id="pf-region">
+            <option value="">선택</option>
+            ${REGIONS.map(r => `<option value="${r}" ${p.region === r ? 'selected' : ''}>${r}</option>`).join('')}
+          </select>
         </div>
       </div>
       <div class="form-group">
-        <label class="form-label">거주 지역</label>
-        <select class="form-select" id="pf-region">
-          <option value="">선택하세요</option>
-          ${REGIONS.map(r => `<option value="${r}" ${p.region === r ? 'selected' : ''}>${r}</option>`).join('')}
-        </select>
+        <label class="form-label">이름 <span style="font-size:.7rem;color:var(--text-dim)">(선택 — 개인화 안내에 사용)</span></label>
+        <input class="form-input" id="pf-name" type="text" placeholder="홍길동" value="${esc(p.name || '')}">
       </div>
     </div>
 
-    <!-- 가구 정보 -->
+    <!-- ── 선택: 상세 정보 ── -->
+    <div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+      <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">선택 — 입력할수록 정확한 매칭</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+
+    <!-- 가구 -->
     <div class="profile-section">
-      <div class="profile-section-title">가구 정보</div>
+      <div class="profile-section-title">가구 상황 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택)</span></div>
       <div class="form-group">
         <label class="form-label">가구 유형</label>
         <select class="form-select" id="pf-household-type">
-          <option value="">선택하세요</option>
+          <option value="">선택 안 함</option>
           ${[
             ['single', '1인 가구'],
             ['couple', '부부 가구'],
             ['nuclear', '핵가족 (부부+자녀)'],
             ['single-parent', '한부모 가구'],
             ['multi-gen', '3세대 이상'],
-            ['other', '기타'],
           ].map(([val, label]) => `<option value="${val}" ${p.householdType === val ? 'selected' : ''}>${label}</option>`).join('')}
         </select>
       </div>
@@ -71,7 +59,7 @@ function renderProfilePage() {
         <div class="form-group">
           <label class="form-label">가구원 수</label>
           <select class="form-select" id="pf-household-size">
-            <option value="">선택</option>
+            <option value="">선택 안 함</option>
             ${[1,2,3,4,5,6].map(n => `<option value="${n}" ${p.householdSize == n ? 'selected' : ''}>${n}명${n===6?'+':''}</option>`).join('')}
           </select>
         </div>
@@ -91,70 +79,69 @@ function renderProfilePage() {
       </div>
     </div>
 
-    <!-- 소득 정보 -->
+    <!-- 소득 (민감정보) -->
     <div class="profile-section">
-      <div class="profile-section-title">소득 정보</div>
+      <div class="profile-section-title">소득 수준 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택)</span></div>
+      <div style="font-size:.76rem;color:var(--text-muted);margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;line-height:1.6">
+        소득 정보는 이 기기에만 저장되며 외부로 전송되지 않습니다.<br>
+        입력하면 기초생활·주거급여 등 소득 기반 혜택을 더 정확히 찾을 수 있습니다.
+      </div>
       <div class="form-group">
-        <label class="form-label">기준 중위소득 대비 (%)</label>
+        <label class="form-label">기준 중위소득 대비</label>
         <select class="form-select" id="pf-income">
-          <option value="">선택하세요</option>
+          <option value="">입력 안 함</option>
           ${[
-            ['30', '30% 이하 (기초생계급여 대상)'],
-            ['40', '40% 이하 (기초의료급여 대상)'],
-            ['48', '48% 이하 (주거급여 대상)'],
-            ['50', '50% 이하 (교육급여 대상)'],
-            ['60', '60% (저소득)'],
-            ['75', '75% (중위소득 하위)'],
-            ['100', '100% (중위소득)'],
+            ['30', '30% 이하 — 기초생계급여 대상'],
+            ['40', '40% 이하 — 기초의료급여 대상'],
+            ['48', '48% 이하 — 주거급여 대상'],
+            ['50', '50% 이하 — 교육급여 대상'],
+            ['60', '60% 수준 — 저소득'],
+            ['75', '75% 수준'],
+            ['100', '100% 수준 — 중위소득'],
             ['120', '120% 이상'],
           ].map(([val, label]) => `<option value="${val}" ${p.incomePercent === val ? 'selected' : ''}>${label}</option>`).join('')}
         </select>
-        <div class="form-hint">2024년 기준 중위소득 4인 기준 5,729,341원</div>
       </div>
-      <div class="form-group">
-        <label class="form-label">취업 상태</label>
-        <div class="toggle-group" id="pf-employment-group">
-          ${[
-            ['employed', '재직 중'],
-            ['self-employed', '자영업'],
-            ['unemployed', '미취업'],
-            ['retired', '은퇴'],
-          ].map(([val, label]) => `<button class="toggle-btn ${p.employment === val ? 'active' : ''}" data-employment="${val}">${label}</button>`).join('')}
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">취업 상태</label>
+          <div class="toggle-group" id="pf-employment-group">
+            ${[
+              ['employed', '재직'],
+              ['self-employed', '자영업'],
+              ['unemployed', '미취업'],
+              ['retired', '은퇴'],
+            ].map(([val, label]) => `<button class="toggle-btn ${p.employment === val ? 'active' : ''}" data-employment="${val}">${label}</button>`).join('')}
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">주거 형태</label>
+          <div class="toggle-group" id="pf-housing-group">
+            ${[
+              ['own', '자가'],
+              ['jeonse', '전세'],
+              ['rent', '월세'],
+              ['public', '공공임대'],
+            ].map(([val, label]) => `<button class="toggle-btn ${p.housing === val ? 'active' : ''}" data-housing="${val}">${label}</button>`).join('')}
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 주거 정보 -->
+    <!-- 특수 상황 -->
     <div class="profile-section">
-      <div class="profile-section-title">주거 정보</div>
-      <div class="form-group">
-        <label class="form-label">주거 형태</label>
-        <div class="toggle-group" id="pf-housing-group">
-          ${[
-            ['own', '자가'],
-            ['jeonse', '전세'],
-            ['rent', '월세'],
-            ['public', '공공임대'],
-            ['family', '가족 동거'],
-          ].map(([val, label]) => `<button class="toggle-btn ${p.housing === val ? 'active' : ''}" data-housing="${val}">${label}</button>`).join('')}
-        </div>
-      </div>
-    </div>
-
-    <!-- 건강/특수 상황 -->
-    <div class="profile-section">
-      <div class="profile-section-title">건강 및 특수 상황</div>
+      <div class="profile-section-title">특수 상황 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택 — 해당하는 항목만)</span></div>
       <div class="checkbox-group" id="pf-special-group">
         ${[
           ['disability', '장애 등록', '♿'],
           ['pregnant', '임신 중', '🤰'],
           ['elderly', '65세+ 부양', '👴'],
           ['veteran', '국가유공자', '🎖'],
-          ['lowCredit', '신용불량', '📋'],
-          ['foreignMarriage', '결혼이민자', '🌏'],
+          ['lowCredit', '신용불량', ''],
+          ['foreignMarriage', '결혼이민자', ''],
         ].map(([key, label, icon]) => `
           <label class="checkbox-item ${p[key] ? 'checked' : ''}" data-key="${key}">
-            <span>${icon} ${label}</span>
+            <span>${icon ? icon + ' ' : ''}${label}</span>
             <span class="checkbox-check">${p[key] ? '✓' : ''}</span>
           </label>`).join('')}
       </div>
@@ -162,10 +149,7 @@ function renderProfilePage() {
 
     <!-- 저장 버튼 -->
     <button class="btn btn-primary btn-full btn-lg mt20" id="btn-save-profile">
-      프로필 저장하기
-    </button>
-    <button class="btn btn-ghost btn-full mt8" id="btn-find-benefits" style="${APP.profile ? '' : 'display:none'}">
-      맞춤 혜택 찾기
+      저장하고 혜택 조회하기
     </button>
   `;
 
@@ -225,22 +209,18 @@ function initProfileEvents() {
     el.addEventListener('input', updateProfileCompletion);
   });
 
-  // 저장
+  // 저장 + 자동 조회
   document.getElementById('btn-save-profile')?.addEventListener('click', saveProfileFromForm);
-
-  // 혜택 찾기
-  document.getElementById('btn-find-benefits')?.addEventListener('click', () => navigateTo('benefits'));
 }
 
-// ── 프로필 완성도 계산 ───────────────────────────────────────────────
+// ── 프로필 완성도 계산 (필수 2 + 선택 6) ────────────────────────────
 function updateProfileCompletion() {
-  const fields = ['pf-name', 'pf-age', 'pf-region', 'pf-household-type', 'pf-income'];
-  const filled = fields.filter(id => {
-    const el = document.getElementById(id);
-    return el && el.value.trim() !== '';
-  }).length;
+  const required = ['pf-age', 'pf-region'];
+  const optional = ['pf-name', 'pf-household-type', 'pf-income', 'pf-household-size'];
+  const reqFilled = required.filter(id => document.getElementById(id)?.value.trim()).length;
+  const optFilled = optional.filter(id => document.getElementById(id)?.value.trim()).length;
 
-  const pct = Math.round((filled / fields.length) * 100);
+  const pct = Math.round(((reqFilled * 2 + optFilled) / (required.length * 2 + optional.length)) * 100);
   const pctEl = document.getElementById('profile-pct');
   if (pctEl) pctEl.textContent = `${pct}%`;
 
@@ -273,26 +253,71 @@ function readProfileFromForm() {
   };
 }
 
-// ── 프로필 저장 ─────────────────────────────────────────────────────
+// ── 프로필 저장 + 자동 복지 조회 ───────────────────────────────────
 async function saveProfileFromForm() {
   const profile = readProfileFromForm();
 
-  if (!profile.name || !profile.age) {
-    toast('이름과 나이는 필수입니다', 'warn');
+  if (!profile.age) {
+    toast('나이는 필수입니다', 'warn');
+    document.getElementById('pf-age')?.focus();
     return;
   }
 
   saveProfile(profile);
 
-  // 혜택 재계산
+  // 로컬 규칙 매칭 먼저
   const matched = matchBenefits();
   saveBenefits(matched);
   updateWelfareMiniScore();
   renderSidebarUser();
 
-  toast(`${profile.name}님, 프로필이 저장되었습니다! ${matched.length}개 혜택을 찾았어요.`, 'success', 4000);
-  document.getElementById('btn-find-benefits')?.style.removeProperty('display');
+  const name = profile.name ? `${profile.name}님, ` : '';
+  toast(`${name}복지 데이터를 조회합니다...`, 'info', 2000);
 
-  // Supabase 동기화 (비동기 - 실패해도 로컬 저장 유지)
+  // 혜택 페이지로 이동 후 실제 API 자동 조회
+  navigateTo('benefits');
+  setTimeout(() => autoFetchWelfareOnProfileSave(), 400);
+
+  // Supabase 동기화 (비동기)
   dbSaveProfile(profile).catch(() => {});
+}
+
+// ── 프로필 저장 후 자동 API 조회 ────────────────────────────────────
+async function autoFetchWelfareOnProfileSave() {
+  const p = APP.profile;
+  if (!p) return;
+
+  // benefits 페이지의 상태 표시 업데이트
+  const statusEl = document.getElementById('api-fetch-status');
+  const btn = document.getElementById('btn-fetch-api');
+  if (statusEl) statusEl.textContent = '실제 복지 데이터를 조회하는 중...';
+  if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
+
+  const params = new URLSearchParams({
+    type: 'central',
+    rows: '30',
+    lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
+  });
+  const trgCode = profileToTrgCode(p);
+  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+
+  try {
+    const res = await fetch(`/api/welfare?${params}`);
+    const data = await res.json();
+
+    if (data.success && data.items?.length) {
+      const apiMatched = data.items.map(apiItemToLocal);
+      const merged = mergeAndDedupe(APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits(), apiMatched);
+      saveBenefits(merged);
+      renderBenefitsPage();
+      const name = p.name ? `${p.name}님 — ` : '';
+      toast(`${name}복지 혜택 ${merged.length}개 조회 완료`, 'success', 3000);
+    } else {
+      if (statusEl) statusEl.textContent = `API 미연결 — 로컬 데이터 ${APP.matchedBenefits.length}개 표시 중`;
+      if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = '조회 실패 — 로컬 데이터만 표시됩니다';
+    if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
+  }
 }

@@ -82,12 +82,8 @@ export default async function handler(req, res) {
     params.set('callTp', 'L');   // ← 필수
     params.set('pageNo', String(page));
     params.set('numOfRows', String(rows));
-    if (keyword) {
-      params.set('searchWrd', keyword);
-      params.set('srchKeyCode', srchKeyCode || '003'); // 003: 제목+내용(가장 폭넓음)
-    } else if (srchKeyCode) {
-      params.set('srchKeyCode', srchKeyCode);
-    }
+    params.set('srchKeyCode', srchKeyCode || '003'); // 필수 — 003: 제목+내용(가장 폭넓음)
+    if (keyword) params.set('searchWrd', keyword);
     if (lifeArray) params.set('lifeArray', lifeArray);
     if (trgterIndvdlArray) params.set('trgterIndvdlArray', trgterIndvdlArray);
     if (intrsThemaArray) params.set('intrsThemaArray', intrsThemaArray);

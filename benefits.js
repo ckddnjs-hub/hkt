@@ -208,7 +208,7 @@ function renderRuleMatchSummary(matched) {
       </div>
     </div>
     <div id="api-fetch-status" style="font-size:.76rem;color:var(--text-dim)">
-      ※ '실제 복지 조회'를 누르면 공공데이터포털 최신 복지 목록을 가져옵니다
+      프로필 저장 시 자동 조회됩니다 · 수동으로 다시 조회하려면 위 버튼을 누르세요
     </div>`;
 }
 
@@ -242,8 +242,8 @@ async function fetchWelfareAPI() {
       toast(`실제 복지 데이터 ${data.items.length}건 조회 완료!`, 'success', 3000);
     } else {
       const msg = data.error || data.message || '연결 실패';
-      if (statusEl) statusEl.textContent = `⚠️ API 미연결 (${msg}) — 로컬 데이터만 표시`;
-      if (btn) { btn.disabled = false; btn.textContent = '🔄 실제 복지 조회'; }
+      if (statusEl) statusEl.textContent = `API 미연결 (${msg}) — 로컬 데이터만 표시`;
+      if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
       toast('API 미연결 — 로컬 데이터만 표시됩니다', 'warn', 3000);
     }
   } catch (e) {
