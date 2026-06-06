@@ -132,6 +132,8 @@ function showApp() {
   initRouter();
   renderSidebarUser();
   updateWelfareMiniScore();
+  // 사이드바 API 위젯 초기화
+  if (typeof renderSidebarAPIWidget === 'function') renderSidebarAPIWidget();
   // 초기 페이지 렌더
   onPageEnter(APP.currentPage || 'home');
 }

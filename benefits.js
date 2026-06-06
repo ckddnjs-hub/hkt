@@ -3,6 +3,12 @@
 let benefitsFilter = 'all';
 let selectedBenefitId = null;
 
+// ── 복지 API 점검 상태 ───────────────────────────────────────────────
+const WelfareAPITest = {
+  status: 'idle',   // 'idle' | 'loading' | 'ok' | 'error'
+  result: null,     // { count, firstItem, attempted, error }
+};
+
 // ── 혜택 페이지 렌더링 ───────────────────────────────────────────────
 function renderBenefitsPage() {
   const page = document.getElementById('page-benefits');
@@ -369,4 +375,188 @@ function detectCategoryFromAPI(item) {
 function mergeAndDedupe(local, apiItems) {
   const ids = new Set(local.map(b => b.id));
   return [...local, ...apiItems.filter(b => !ids.has(b.id))];
+}
+
+// ══════════════════════════════════════════════════════════════════
+// 복지 API 점검 카드
+// ══════════════════════════════════════════════════════════════════
+
+// ── 점검 카드 렌더 ────────────────────────────────────────────────
+function renderWelfareAPICard() {
+  const p = APP.profile;
+  const age = parseInt(p?.age || 0);
+  const lifeCode = p ? ageToLifeCode(age, p.pregnant) : '—';
+  const lifeLabel = { '001':'영유아','002':'아동','003':'청소년','004':'청년','005':'중장년','006':'노년','007':'임신·출산' }[lifeCode] || '—';
+  const trgCode = p ? profileToTrgCode(p) : '';
+  const trgLabel = { '040':'장애인','050':'저소득','060':'한부모·조손' }[trgCode] || '';
+
+  const params = [
+    ['callTp',      'L',                       '필수'],
+    ['srchKeyCode', '003 (제목+내용)',           '필수'],
+    ['pageNo',      '1',                        '필수'],
+    ['numOfRows',   '30',                       '필수'],
+    ['lifeArray',   lifeCode ? `${lifeCode} (${lifeLabel})` : '—', '프로필 기반'],
+    ['age',         p?.age ? String(parseInt(p.age)) : '—', '프로필 기반'],
+    ['trgterIndvdlArray', trgCode ? `${trgCode} (${trgLabel})` : '—', '프로필 기반'],
+  ];
+
+  const { status, result } = WelfareAPITest;
+
+  const statusBadge = {
+    idle:    `<span style="color:var(--text-dim)">● 미실행</span>`,
+    loading: `<span style="color:var(--warn)">● 점검 중...</span>`,
+    ok:      `<span style="color:var(--success)">● 연결됨</span>`,
+    error:   `<span style="color:var(--danger)">● 오류</span>`,
+  }[status];
+
+  let resultHTML = '';
+  if (status === 'ok' && result) {
+    resultHTML = `
+      <div style="margin-top:12px;padding:10px;background:rgba(16,185,129,.08);border-radius:8px;border:1px solid rgba(16,185,129,.2)">
+        <div style="font-size:.82rem;font-weight:700;color:var(--success);margin-bottom:6px">응답 성공</div>
+        <div style="font-size:.78rem;color:var(--text-muted)">총 ${result.totalCount}건 / 이번 응답 ${result.count}건</div>
+        ${result.firstItem ? `
+          <div style="margin-top:8px;font-size:.78rem;border-top:1px solid var(--border);padding-top:8px">
+            <div style="font-weight:700;color:var(--text)">${esc(result.firstItem.servNm || '')}</div>
+            <div style="color:var(--text-muted)">${esc(result.firstItem.jurMnofNm || '')} · ${esc(result.firstItem.sprtCycNm || '')}</div>
+          </div>` : ''}
+      </div>`;
+  } else if (status === 'error' && result) {
+    resultHTML = `
+      <div style="margin-top:12px;padding:10px;background:rgba(239,68,68,.06);border-radius:8px;border:1px solid rgba(239,68,68,.2)">
+        <div style="font-size:.82rem;font-weight:700;color:var(--danger);margin-bottom:4px">오류 내용</div>
+        <div style="font-size:.78rem;color:var(--text-muted);margin-bottom:6px;word-break:break-all">${esc(result.error || '')}</div>
+        ${result.attempted ? `
+          <div style="font-size:.72rem;color:var(--text-dim);word-break:break-all">
+            <span style="font-weight:700">요청 URL</span><br>${esc(result.attempted)}
+          </div>` : ''}
+      </div>`;
+  }
+
+  return `
+    <div class="card mb16" id="welfare-api-check-card">
+      <div class="section-header" style="margin-bottom:10px">
+        <div>
+          <div class="section-title">복지 API 점검</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">${statusBadge}</div>
+        </div>
+        <button class="btn btn-sm" style="background:var(--bg3);color:var(--text)"
+          id="btn-api-check" onclick="runWelfareAPICheck()">
+          점검 실행
+        </button>
+      </div>
+
+      <!-- 요청 파라미터 테이블 -->
+      <div style="font-size:.72rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">요청 파라미터</div>
+      <div style="background:var(--bg3);border-radius:8px;overflow:hidden;margin-bottom:4px">
+        ${params.map((r, i) => `
+          <div style="display:flex;padding:6px 10px;${i ? 'border-top:1px solid var(--border)' : ''}">
+            <div style="width:42%;font-size:.76rem;font-weight:700;color:var(--text);font-family:monospace">${r[0]}</div>
+            <div style="flex:1;font-size:.76rem;color:${r[2]==='필수'?'var(--primary)':'var(--text-muted)'}">${esc(r[1])}</div>
+            <div style="font-size:.68rem;color:var(--text-dim);white-space:nowrap">${r[2]}</div>
+          </div>`).join('')}
+      </div>
+
+      ${!p ? `<div style="font-size:.75rem;color:var(--text-dim);margin-top:6px">※ 프로필 입력 시 lifeArray · age · trgterIndvdlArray가 자동 설정됩니다</div>` : ''}
+
+      ${resultHTML}
+    </div>
+  `;
+}
+
+// ── 점검 실행 ─────────────────────────────────────────────────────
+async function runWelfareAPICheck() {
+  WelfareAPITest.status = 'loading';
+  WelfareAPITest.result = null;
+  _refreshAPICheckCard();
+
+  const p = APP.profile;
+  const params = new URLSearchParams({ type: 'central', rows: '5' });
+  params.set('lifeArray', ageToLifeCode(parseInt(p?.age || 30), p?.pregnant));
+  if (p?.age) params.set('age', String(parseInt(p.age)));
+  const trgCode = p ? profileToTrgCode(p) : '';
+  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+
+  try {
+    const res = await fetch(`/api/welfare?${params}`);
+    const data = await res.json();
+
+    if (data.success && data.items?.length) {
+      WelfareAPITest.status = 'ok';
+      WelfareAPITest.result = {
+        totalCount: data.totalCount,
+        count: data.count,
+        firstItem: data.items[0],
+      };
+    } else {
+      WelfareAPITest.status = 'error';
+      WelfareAPITest.result = {
+        error: data.error || data.message || '응답 없음',
+        attempted: data.attempted || '',
+      };
+    }
+  } catch (e) {
+    WelfareAPITest.status = 'error';
+    WelfareAPITest.result = { error: e.message, attempted: '' };
+  }
+
+  _refreshAPICheckCard();
+}
+
+function _refreshAPICheckCard() {
+  // 혜택 페이지 내 카드 갱신
+  const slot = document.getElementById('welfare-api-check-card');
+  if (slot) slot.outerHTML = renderWelfareAPICard();
+  // 사이드바 위젯 갱신
+  renderSidebarAPIWidget();
+}
+
+// ── 사이드바 상시 위젯 ────────────────────────────────────────────
+function renderSidebarAPIWidget() {
+  const el = document.getElementById('sidebar-api-widget');
+  if (!el) return;
+
+  const { status, result } = WelfareAPITest;
+
+  const dot = {
+    idle:    `<span style="color:var(--text-dim)">●</span>`,
+    loading: `<span style="color:var(--warn)">●</span>`,
+    ok:      `<span style="color:var(--success)">●</span>`,
+    error:   `<span style="color:var(--danger)">●</span>`,
+  }[status];
+
+  const label = {
+    idle:    '미실행',
+    loading: '점검 중...',
+    ok:      `연결됨 · ${result?.totalCount ?? 0}건`,
+    error:   '오류',
+  }[status];
+
+  let detail = '';
+  if (status === 'ok' && result?.firstItem) {
+    detail = `<div style="font-size:.72rem;color:var(--text-muted);margin-top:4px;line-height:1.5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(result.firstItem.servNm || '')}</div>`;
+  }
+  if (status === 'error' && result?.error) {
+    detail = `<div style="font-size:.72rem;color:var(--danger);margin-top:4px;line-height:1.5;word-break:break-all">${esc(result.error)}</div>`;
+    if (result.attempted) {
+      detail += `<div style="font-size:.68rem;color:var(--text-dim);margin-top:3px;word-break:break-all">${esc(result.attempted)}</div>`;
+    }
+  }
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:.73rem;font-weight:700;color:var(--text-muted)">복지 API</div>
+      <button
+        onclick="runWelfareAPICheck()"
+        style="font-size:.68rem;padding:3px 8px;border-radius:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text-muted);cursor:pointer;font-family:inherit"
+        ${status === 'loading' ? 'disabled' : ''}>
+        점검
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;font-size:.76rem">
+      ${dot}
+      <span style="color:var(--text)">${label}</span>
+    </div>
+    ${detail}
+  `;
 }
