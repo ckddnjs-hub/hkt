@@ -2,7 +2,6 @@
 
 let benefitsFilter = 'all';
 let selectedBenefitId = null;
-const SimplifyState = {}; // { [id]: 'idle'|'loading'|'done', text? }
 
 // ── AI 검색 상태 ─────────────────────────────────────────────────────
 const BenefitsSearch = {
@@ -101,11 +100,10 @@ function renderBenefitsPage() {
 
 function renderBenefitCard(b) {
   const cat = BENEFIT_CATEGORIES[b.category] || { icon: '📋', color: '#64748B', label: b.category };
-  const state = SimplifyState[b.id];
 
   return `
-    <div class="benefit-card" id="bcard-${b.id}">
-      <div class="benefit-card-header" onclick="openBenefitDetail('${b.id}')" style="cursor:pointer">
+    <div class="benefit-card" id="bcard-${b.id}" onclick="openBenefitDetail('${b.id}')" style="cursor:pointer">
+      <div class="benefit-card-header">
         <div class="benefit-cat-icon" style="background:${cat.color}20">
           <span style="font-size:1.2rem">${cat.icon}</span>
         </div>
@@ -113,76 +111,13 @@ function renderBenefitCard(b) {
           <div class="benefit-name">${esc(b.name)}</div>
           <div class="benefit-agency">${esc(b.agency)}</div>
         </div>
+        ${b.onapPsbltYn === 'Y' ? `<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success);font-size:.68rem;white-space:nowrap">온라인 신청</span>` : ''}
       </div>
-      <div class="benefit-amount">${esc(b.amount || '')}</div>
-
-      <!-- 원문 설명 -->
-      <div class="benefit-desc" id="bdesc-${b.id}">${esc(b.description || '')}</div>
-
-      <!-- 쉬운말 결과 -->
-      ${state?.status === 'done' ? `
-        <div style="margin-top:10px;padding:10px;background:rgba(59,130,246,.06);border-radius:8px;border-left:3px solid var(--primary)">
-          <div style="font-size:.72rem;font-weight:700;color:var(--primary);margin-bottom:4px">쉬운 말 설명</div>
-          <div style="font-size:.84rem;color:var(--text);line-height:1.7">${esc(state.text || '')}</div>
-        </div>` : ''}
-
-      <!-- 쉬운말 버튼 -->
-      <div style="margin-top:10px;display:flex;justify-content:flex-end">
-        ${state?.status === 'loading'
-          ? `<span style="font-size:.75rem;color:var(--text-muted)">변환 중...</span>`
-          : state?.status === 'done'
-            ? `<button onclick="simplifyBenefit('${b.id}')" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit">다시 변환</button>`
-            : `<button onclick="simplifyBenefit('${b.id}')" style="font-size:.75rem;padding:5px 12px;border-radius:8px;border:1px solid var(--primary);background:transparent;color:var(--primary);cursor:pointer;font-family:inherit;font-weight:600">쉬운말로 보기</button>`
-        }
-      </div>
+      ${b.amount ? `<div class="benefit-amount">${esc(b.amount)}</div>` : ''}
+      ${b.description ? `<div class="benefit-desc">${esc(b.description)}</div>` : ''}
     </div>`;
 }
 
-// ── 쉬운말 변환 (gpt-4o) ─────────────────────────────────────────
-async function simplifyBenefit(id) {
-  const b = APP.matchedBenefits.find(x => x.id === id) || WELFARE_DB.find(x => x.id === id);
-  if (!b) return;
-
-  SimplifyState[id] = { status: 'loading' };
-  _rerenderCard(id, b);
-
-  const text = [b.name, b.agency, b.description, b.amount].filter(Boolean).join('\n');
-
-  try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        temperature: 0.3,
-        max_tokens: 300,
-        messages: [
-          { role: 'system', content: `당신은 복지 서비스 안내를 쉬운 말로 바꿔주는 전문가입니다.
-어르신·장애인도 이해할 수 있게 다음 규칙을 지키세요:
-- 어려운 행정 용어 → 일상 언어로
-- 대상이 누구인지, 얼마를 받는지, 어디서 신청하는지 포함
-- 200자 이내, 따뜻하고 친근한 말투
-- 설명 텍스트만 출력 (제목·라벨 없이)` },
-          { role: 'user', content: text },
-        ],
-      }),
-    });
-    const data = await res.json();
-    SimplifyState[id] = { status: 'done', text: data.success ? data.content : '변환 실패' };
-  } catch (e) {
-    SimplifyState[id] = { status: 'done', text: '변환 중 오류가 발생했습니다.' };
-  }
-
-  _rerenderCard(id, b);
-}
-
-function _rerenderCard(id, b) {
-  const el = document.getElementById(`bcard-${id}`);
-  if (!el) return;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = renderBenefitCard(b);
-  el.replaceWith(tmp.firstElementChild);
-}
 
 // ── 혜택 필터 ────────────────────────────────────────────────────────
 function filterBenefits(filter, btn) {
@@ -206,10 +141,11 @@ function openBenefitDetail(benefitId) {
     dbTrackBenefitView(benefitId).catch(() => {});
   }
 
-  // API 항목은 matchedBenefits에, 로컬 항목은 WELFARE_DB에 있음
-  const benefit = APP.matchedBenefits.find(b => b.id === benefitId)
+  // 검색 결과 → 매칭 → 로컬 DB 순서로 탐색
+  const benefit = BenefitsSearch.results.find(b => b.id === benefitId)
+               || APP.matchedBenefits.find(b => b.id === benefitId)
                || WELFARE_DB.find(b => b.id === benefitId);
-  if (!benefit) return;
+  if (!benefit) { console.warn('[상세] 혜택 못 찾음:', benefitId); return; }
 
   selectedBenefitId = benefitId;
   const modal = document.getElementById('benefit-detail-modal');
@@ -293,14 +229,90 @@ async function fetchAndRenderBenefitDetail(servId) {
     const data = await res.json();
 
     if (!data.success || !data.items?.[0]) {
-      slot.innerHTML = `<div style="font-size:.78rem;color:var(--text-dim)">상세 정보를 불러오지 못했습니다.</div>`;
+      slot.innerHTML = `<div style="font-size:.78rem;color:var(--text-dim);padding:8px 0">상세 정보를 불러오지 못했습니다.</div>`;
       return;
     }
 
     const d = data.items[0];
-    slot.innerHTML = renderAPIDetailSections(d);
+    // 상세 내용 + 쉬운말 버튼
+    slot.innerHTML = `
+      ${renderAPIDetailSections(d)}
+      <div id="modal-simplify-area" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <button
+          onclick="simplifyModalDetail('${servId}')"
+          style="width:100%;padding:12px;border-radius:10px;border:2px solid var(--primary);background:transparent;color:var(--primary);font-size:.88rem;font-weight:700;cursor:pointer;font-family:inherit">
+          쉬운말로 보기 (GPT-4o)
+        </button>
+      </div>
+    `;
+    // 상세 데이터를 캐시로 저장
+    _detailCache[servId] = d;
   } catch (e) {
-    slot.innerHTML = '';
+    slot.innerHTML = `<div style="font-size:.78rem;color:var(--danger)">오류: ${e.message}</div>`;
+  }
+}
+
+const _detailCache = {}; // servId → 상세 데이터 캐시
+
+// ── 모달에서 쉬운말 변환 ──────────────────────────────────────────
+async function simplifyModalDetail(servId) {
+  const area = document.getElementById('modal-simplify-area');
+  if (!area) return;
+
+  const d = _detailCache[servId];
+  if (!d) return;
+
+  area.innerHTML = `
+    <div class="typing-dots" style="justify-content:center;padding:12px 0">
+      <span></span><span></span><span></span>
+    </div>
+    <div style="text-align:center;font-size:.76rem;color:var(--text-muted)">GPT-4o가 쉬운 말로 바꾸는 중...</div>
+  `;
+
+  // 상세 텍스트 조합 (가장 중요한 필드 우선)
+  const fullText = [
+    d.servNm && `서비스명: ${d.servNm}`,
+    d.wlfareInfoOutlCn && `개요: ${d.wlfareInfoOutlCn}`,
+    d.tgtrDtlCn && `대상: ${d.tgtrDtlCn}`,
+    d.alwServCn && `지원내용: ${d.alwServCn}`,
+    d.slctCritCn && `선정기준: ${d.slctCritCn}`,
+    d.applmetList?.[0]?.servSeDetailNm && `신청방법: ${d.applmetList[0].servSeDetailNm}`,
+  ].filter(Boolean).join('\n\n').slice(0, 2000); // 토큰 절약
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.3,
+        max_tokens: 400,
+        messages: [
+          { role: 'system', content: `당신은 복지 서비스 내용을 어르신·장애인도 이해할 수 있도록 쉬운 말로 바꾸는 전문가입니다.
+규칙:
+- 어려운 행정·법률 용어를 일상 언어로 대체
+- 누가 받을 수 있는지, 얼마나 받는지, 어디서 신청하는지 포함
+- 300자 이내, 따뜻하고 친근한 말투
+- 단락 구분하여 읽기 쉽게` },
+          { role: 'user', content: fullText },
+        ],
+      }),
+    });
+    const json = await res.json();
+    const text = json.success ? json.content : '변환에 실패했습니다.';
+
+    area.innerHTML = `
+      <div style="padding:14px;background:rgba(59,130,246,.06);border-radius:10px;border-left:3px solid var(--primary)">
+        <div style="font-size:.72rem;font-weight:700;color:var(--primary);margin-bottom:8px">쉬운 말 설명 (GPT-4o)</div>
+        <div style="font-size:.86rem;color:var(--text);line-height:1.8;white-space:pre-wrap">${esc(text)}</div>
+      </div>
+      <button onclick="simplifyModalDetail('${servId}')"
+        style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-size:.76rem;cursor:pointer;font-family:inherit">
+        다시 변환
+      </button>
+    `;
+  } catch (e) {
+    area.innerHTML = `<div style="color:var(--danger);font-size:.8rem">오류: ${e.message}</div>`;
   }
 }
 
