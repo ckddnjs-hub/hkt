@@ -3,6 +3,15 @@
 let benefitsFilter = 'all';
 let selectedBenefitId = null;
 
+// ── AI 검색 상태 ─────────────────────────────────────────────────────
+const BenefitsSearch = {
+  status: 'idle',     // 'idle' | 'analyzing' | 'fetching' | 'done' | 'error'
+  intent: '',         // GPT가 요약한 의도
+  extracted: null,    // 추출된 파라미터 { keyword, lifeArray, trgterIndvdlArray, intrsThemaArray }
+  results: [],        // API 결과 카드 배열
+  error: '',
+};
+
 // ── 복지 API 점검 상태 ───────────────────────────────────────────────
 const WelfareAPITest = {
   status: 'idle',   // 'idle' | 'loading' | 'ok' | 'error'
@@ -21,6 +30,28 @@ function renderBenefitsPage() {
   page.innerHTML = `
     <div class="page-title">맞춤 복지 혜택</div>
     <div class="page-sub">규칙 기반으로 판정된 나만의 혜택 목록</div>
+
+    <!-- AI 복지 검색 -->
+    <div class="card mb16">
+      <div style="font-size:.84rem;font-weight:700;margin-bottom:8px">어떤 도움이 필요하신가요?</div>
+      <div style="font-size:.76rem;color:var(--text-muted);margin-bottom:10px">
+        상황을 자유롭게 입력하면 AI가 의도를 분석해 맞는 복지 혜택을 찾아드립니다
+      </div>
+      <div style="display:flex;gap:8px">
+        <input
+          id="benefits-search-input"
+          class="form-input"
+          style="flex:1"
+          placeholder="예: 최근 실직했어요 / 임신 중인데 지원받고 싶어요 / 혼자 사는 어르신이에요"
+          onkeydown="if(event.key==='Enter')searchBenefitsWithAI(this.value)"
+        >
+        <button class="btn btn-primary" style="white-space:nowrap" onclick="searchBenefitsWithAI(document.getElementById('benefits-search-input').value)">
+          검색
+        </button>
+      </div>
+      <!-- AI 검색 결과 영역 -->
+      <div id="ai-search-results">${renderSearchResults()}</div>
+    </div>
 
     <!-- 복지에코 규칙 기반 자격 판정 패널 -->
     <div class="card mb16" id="rule-match-panel">
@@ -375,6 +406,173 @@ function detectCategoryFromAPI(item) {
 function mergeAndDedupe(local, apiItems) {
   const ids = new Set(local.map(b => b.id));
   return [...local, ...apiItems.filter(b => !ids.has(b.id))];
+}
+
+// ══════════════════════════════════════════════════════════════════
+// AI 복지 검색 파이프라인
+// 흐름: 자유 입력 → GPT 의도분석(파라미터 추출) → 복지 API → 카드
+// ══════════════════════════════════════════════════════════════════
+
+async function searchBenefitsWithAI(query) {
+  query = (query || '').trim();
+  if (!query) { toast('검색어를 입력해주세요', 'warn'); return; }
+
+  BenefitsSearch.status = 'analyzing';
+  BenefitsSearch.intent = '';
+  BenefitsSearch.extracted = null;
+  BenefitsSearch.results = [];
+  BenefitsSearch.error = '';
+  updateSearchResultsUI();
+
+  try {
+    // ── 1단계: GPT 의도 분석 → API 파라미터 추출 ──────────────────
+    const extracted = await extractWelfareParams(query);
+    BenefitsSearch.intent = extracted.intent || query;
+    BenefitsSearch.extracted = extracted;
+    BenefitsSearch.status = 'fetching';
+    updateSearchResultsUI();
+
+    // ── 2단계: 복지 API 호출 ──────────────────────────────────────
+    const urlParams = new URLSearchParams({ type: 'central', rows: '20' });
+    if (extracted.keyword)             urlParams.set('keyword', extracted.keyword);
+    if (extracted.lifeArray)           urlParams.set('lifeArray', extracted.lifeArray);
+    if (extracted.trgterIndvdlArray)   urlParams.set('trgterIndvdlArray', extracted.trgterIndvdlArray);
+    if (extracted.intrsThemaArray)     urlParams.set('intrsThemaArray', extracted.intrsThemaArray);
+
+    // 프로필 age는 항상 포함 (필터 정확도 향상)
+    const p = APP.profile;
+    if (p?.age) urlParams.set('age', String(parseInt(p.age)));
+
+    const res = await fetch(`/api/welfare?${urlParams}`);
+    const data = await res.json();
+
+    if (data.success && data.items?.length) {
+      BenefitsSearch.results = data.items.map(apiItemToLocal);
+      BenefitsSearch.status = 'done';
+    } else {
+      BenefitsSearch.error = data.error || '해당 조건의 혜택을 찾지 못했습니다';
+      BenefitsSearch.status = 'error';
+    }
+  } catch (e) {
+    BenefitsSearch.error = e.message;
+    BenefitsSearch.status = 'error';
+  }
+
+  updateSearchResultsUI();
+}
+
+// ── GPT 의도 분석: 자유 텍스트 → welfare API 파라미터 JSON ─────────
+async function extractWelfareParams(query) {
+  const p = APP.profile;
+  const profileCtx = p
+    ? `프로필: ${p.age || ''}세 / ${p.region || ''} / ${[
+        p.disability && '장애인',
+        p.pregnant && '임신중',
+        p.elderly && '노인부양',
+        p.incomePercent && `중위소득 ${p.incomePercent}%`,
+        p.householdType === 'single-parent' && '한부모',
+      ].filter(Boolean).join(', ') || '정보없음'}`
+    : '';
+
+  const system = `당신은 한국 복지서비스 API 파라미터 추출기입니다.
+사용자 입력을 분석해 아래 JSON만 출력하세요 (마크다운 없이).
+
+코드표:
+lifeArray: 001영유아 002아동 003청소년 004청년(19-34세) 005중장년(35-64세) 006노년(65+) 007임신·출산
+trgterIndvdlArray: 010다문화·탈북민 020다자녀 030보훈 040장애인 050저소득 060한부모·조손
+intrsThemaArray: 010신체건강 020정신건강 030생활지원 040주거 050일자리 060문화·여가 070안전·위기 080임신·출산 090보육 100교육 120보호·돌봄 130서민금융 140법률
+
+${profileCtx}
+
+출력 형식 (값이 없으면 빈 문자열):
+{"keyword":"핵심검색어","lifeArray":"코드","trgterIndvdlArray":"코드","intrsThemaArray":"코드","intent":"의도요약(10자내)"}`;
+
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: query },
+      ],
+      temperature: 0.1,
+      max_tokens: 120,
+    }),
+  });
+
+  const data = await res.json();
+  if (!data.success) throw new Error(data.error || 'GPT 응답 실패');
+
+  // JSON 추출 (GPT가 가끔 ```json 래핑하는 경우 대비)
+  const raw = data.content.replace(/```json?|```/g, '').trim();
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('파라미터 파싱 실패');
+  return JSON.parse(raw.slice(start, end + 1));
+}
+
+// ── 검색 결과 UI 렌더 ─────────────────────────────────────────────
+function renderSearchResults() {
+  const { status, intent, extracted, results, error } = BenefitsSearch;
+
+  if (status === 'idle') return '';
+
+  if (status === 'analyzing') return `
+    <div style="padding:16px 0;text-align:center">
+      <div class="typing-dots" style="justify-content:center"><span></span><span></span><span></span></div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px">AI가 의도를 분석하는 중...</div>
+    </div>`;
+
+  if (status === 'fetching') return `
+    <div style="padding:16px 0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span class="badge" style="background:rgba(99,102,241,.12);color:var(--accent)">${esc(intent)}</span>
+        ${_extractedParamBadges(extracted)}
+      </div>
+      <div class="typing-dots" style="justify-content:center"><span></span><span></span><span></span></div>
+      <div style="font-size:.78rem;color:var(--text-muted);margin-top:8px;text-align:center">복지 API에서 검색하는 중...</div>
+    </div>`;
+
+  if (status === 'error') return `
+    <div style="padding:12px 0">
+      <div style="font-size:.82rem;color:var(--danger)">${esc(error)}</div>
+      <div style="font-size:.75rem;color:var(--text-dim);margin-top:4px">다른 표현으로 다시 검색해보세요</div>
+    </div>`;
+
+  if (status === 'done') return `
+    <div style="margin-top:14px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">${esc(intent)}</span>
+        ${_extractedParamBadges(extracted)}
+        <span style="font-size:.74rem;color:var(--text-muted)">${results.length}건</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${results.map(b => renderBenefitCard(b)).join('')}
+      </div>
+    </div>`;
+
+  return '';
+}
+
+// 추출된 파라미터를 배지로 표시
+function _extractedParamBadges(ex) {
+  if (!ex) return '';
+  const lifeLabels = { '001':'영유아','002':'아동','003':'청소년','004':'청년','005':'중장년','006':'노년','007':'임신·출산' };
+  const trgLabels  = { '010':'다문화','020':'다자녀','030':'보훈','040':'장애인','050':'저소득','060':'한부모' };
+  const themeLabels= { '010':'신체건강','020':'정신건강','030':'생활지원','040':'주거','050':'일자리','060':'문화','070':'안전','080':'임신·출산','090':'보육','100':'교육','120':'돌봄','130':'서민금융','140':'법률' };
+
+  return [
+    ex.keyword && `<span class="badge" style="background:var(--bg3);color:var(--text)">"${esc(ex.keyword)}"</span>`,
+    ex.lifeArray && `<span class="badge" style="background:var(--bg3);color:var(--text-muted)">${lifeLabels[ex.lifeArray] || ex.lifeArray}</span>`,
+    ex.trgterIndvdlArray && `<span class="badge" style="background:var(--bg3);color:var(--text-muted)">${trgLabels[ex.trgterIndvdlArray] || ex.trgterIndvdlArray}</span>`,
+    ex.intrsThemaArray && `<span class="badge" style="background:var(--bg3);color:var(--text-muted)">${themeLabels[ex.intrsThemaArray] || ex.intrsThemaArray}</span>`,
+  ].filter(Boolean).join('');
+}
+
+// ── 검색 결과 DOM 갱신 ────────────────────────────────────────────
+function updateSearchResultsUI() {
+  const el = document.getElementById('ai-search-results');
+  if (el) el.innerHTML = renderSearchResults();
 }
 
 // ══════════════════════════════════════════════════════════════════

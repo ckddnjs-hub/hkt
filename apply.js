@@ -137,7 +137,7 @@ function renderHomePage() {
   page.innerHTML = `
 
     <!-- ── 히어로: 혜택 수 중심 ── -->
-    <div class="home-hero" style="padding-bottom:20px">
+    <div class="home-hero" style="padding-bottom:16px">
       <div class="home-hero-label">
         ${p ? `${esc(p.name || '')} · ${isDeliverer ? '전달자 모드' : '당사자 모드'}` : '복지에코'}
       </div>
@@ -146,12 +146,42 @@ function renderHomePage() {
         <span style="font-size:1.1rem;margin-left:4px">개</span>
       </div>
       <div class="home-hero-sub">
-        ${p
-          ? `규칙 기반 자격 판정 완료 · 지금 신청 가능한 혜택`
-          : '프로필 입력 후 규칙 기반으로 판정합니다'}
+        ${p ? '규칙 기반 자격 판정 완료 · 지금 신청 가능한 혜택' : '나에게 맞는 복지 혜택을 찾아드립니다'}
       </div>
-      <div class="home-hero-bar">
-        <div class="home-hero-bar-fill" style="width:${p ? Math.min(100, matched.length * 6) : 0}%"></div>
+    </div>
+
+    <!-- ── 메인 검색창 ── -->
+    <div class="card" style="margin-bottom:14px;padding:16px">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text)">
+        어떤 도움이 필요하신가요?
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input
+          id="home-search-input"
+          class="form-input"
+          style="flex:1;font-size:.9rem"
+          placeholder="예: 실직했어요 / 임신 중이에요 / 혼자 사는 어르신이에요"
+          onkeydown="if(event.key==='Enter')homeSearch()"
+        >
+        <button class="btn btn-primary" style="white-space:nowrap;padding:0 18px" onclick="homeSearch()">
+          검색
+        </button>
+      </div>
+      <!-- 예시 칩 -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${[
+          '실직했어요',
+          '임신 중이에요',
+          '65세 이상 노인',
+          '장애인 지원',
+          '저소득 가구',
+          '한부모 가정',
+        ].map(ex => `
+          <button
+            onclick="homeSearchWith('${ex}')"
+            style="font-size:.72rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);cursor:pointer;font-family:inherit">
+            ${ex}
+          </button>`).join('')}
       </div>
     </div>
 
@@ -315,6 +345,23 @@ function renderHomePage() {
       if (el) countUp(el, matched.length, 500);
     }, 100);
   }
+}
+
+// ── 홈 검색 진입 ─────────────────────────────────────────────────
+function homeSearch() {
+  const query = document.getElementById('home-search-input')?.value.trim();
+  if (!query) { toast('검색어를 입력해주세요', 'warn'); return; }
+  homeSearchWith(query);
+}
+
+function homeSearchWith(query) {
+  // 혜택 페이지로 이동 후 AI 검색 실행
+  navigateTo('benefits');
+  setTimeout(() => {
+    const input = document.getElementById('benefits-search-input');
+    if (input) input.value = query;
+    if (typeof searchBenefitsWithAI === 'function') searchBenefitsWithAI(query);
+  }, 150);
 }
 
 // ── 복지 고지 빠른 방송 생성 (홈 전달자 모드) ─────────────────────
