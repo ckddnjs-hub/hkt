@@ -2,10 +2,11 @@
 
 // ── 음성 상태 ────────────────────────────────────────────────────────
 const Voice = {
-  synth: window.speechSynthesis,
+  synth: window.speechSynthesis, // fallback용
   isPlaying: false,
   isPaused: false,
   utterance: null,
+  audioEl: null,   // OpenAI TTS audio element
   script: '',
   rate: 0.88,
   scriptReady: false,
@@ -248,7 +249,11 @@ async function startVoice() {
 
 // ── 일시정지 ──────────────────────────────────────────────────────
 function pauseVoice() {
-  Voice.synth.pause();
+  if (Voice.audioEl) {
+    Voice.audioEl.pause();
+  } else {
+    Voice.synth.pause();
+  }
   Voice.isPaused = true;
   Voice.isPlaying = false;
   setVoiceUIState('paused');
@@ -256,7 +261,11 @@ function pauseVoice() {
 
 // ── 재개 ──────────────────────────────────────────────────────────
 function resumeVoice() {
-  Voice.synth.resume();
+  if (Voice.audioEl) {
+    Voice.audioEl.play();
+  } else {
+    Voice.synth.resume();
+  }
   Voice.isPaused = false;
   Voice.isPlaying = true;
   setVoiceUIState('playing');
@@ -264,44 +273,103 @@ function resumeVoice() {
 
 // ── 정지 ──────────────────────────────────────────────────────────
 function stopVoice() {
+  if (Voice.audioEl) {
+    Voice.audioEl.pause();
+    Voice.audioEl.currentTime = 0;
+    Voice.audioEl = null;
+  }
   Voice.synth.cancel();
   Voice.isPlaying = false;
   Voice.isPaused = false;
   setVoiceUIState('idle');
 }
 
-// ── 실제 음성 재생 ────────────────────────────────────────────────
-function speakText(text) {
+// ── OpenAI TTS (tts-1-hd, shimmer 목소리) ────────────────────────
+async function openAITTS(text, voice = 'shimmer') {
+  const res = await fetch('/api/tts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `TTS ${res.status}`);
+  }
+
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  return new Audio(url);
+}
+
+// ── 실제 음성 재생 (OpenAI TTS → Web Speech fallback) ────────────
+async function speakText(text) {
+  // 기존 재생 중단
+  if (Voice.audioEl) { Voice.audioEl.pause(); Voice.audioEl = null; }
   Voice.synth.cancel();
 
-  // 긴 텍스트는 문장 단위로 나눠서 재생 (브라우저 버그 방지)
+  setVoiceUIState('loading');
+
+  try {
+    // OpenAI TTS
+    const audio = await openAITTS(text);
+    Voice.audioEl = audio;
+
+    audio.onended = () => {
+      Voice.isPlaying = false;
+      Voice.isPaused  = false;
+      Voice.audioEl   = null;
+      setVoiceUIState('done');
+    };
+    audio.onerror = (e) => {
+      console.warn('[TTS] 재생 오류:', e);
+      Voice.isPlaying = false;
+      Voice.audioEl   = null;
+      setVoiceUIState('idle');
+    };
+
+    audio.play();
+    Voice.isPlaying = true;
+    Voice.isPaused  = false;
+    setVoiceUIState('playing');
+
+    // 스크립트 표시
+    const scriptWrap = document.getElementById('voice-script-wrap');
+    const scriptText = document.getElementById('voice-script-text');
+    if (scriptWrap && Voice.script) {
+      scriptWrap.style.display = 'block';
+      if (scriptText) scriptText.textContent = Voice.script;
+    }
+  } catch (e) {
+    console.warn('[TTS] OpenAI 실패, Web Speech 폴백:', e);
+    _speakWithWebSpeech(text);
+  }
+}
+
+// ── Web Speech API 폴백 ───────────────────────────────────────────
+function _speakWithWebSpeech(text) {
+  Voice.synth.cancel();
   const sentences = text.split(/(?<=[.!?。])\s+/).filter(s => s.trim());
   let idx = 0;
 
   function speakNext() {
     if (idx >= sentences.length) {
       Voice.isPlaying = false;
-      Voice.isPaused = false;
+      Voice.isPaused  = false;
       setVoiceUIState('done');
       return;
     }
-    const utt = new SpeechSynthesisUtterance(sentences[idx]);
-    utt.lang = 'ko-KR';
-    utt.rate = Voice.rate;
-    utt.pitch = 1.0;
-    utt.volume = 1.0;
-
-    utt.onend = () => { idx++; speakNext(); };
+    const utt   = new SpeechSynthesisUtterance(sentences[idx]);
+    utt.lang    = 'ko-KR';
+    utt.rate    = Voice.rate;
+    utt.onend   = () => { idx++; speakNext(); };
     utt.onerror = () => { idx++; speakNext(); };
-
-    // 현재 문장 강조 표시
     highlightScriptLine(idx, sentences.length);
-
     Voice.synth.speak(utt);
   }
 
   Voice.isPlaying = true;
-  Voice.isPaused = false;
+  Voice.isPaused  = false;
   setVoiceUIState('playing');
   speakNext();
 }

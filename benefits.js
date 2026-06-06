@@ -87,15 +87,37 @@ function renderBenefitsPage() {
         <button class="btn btn-primary" onclick="navigateTo('profile')">프로필 입력하기</button>
       </div>` : ''}
 
-    <!-- 혜택 목록 -->
+    <!-- 혜택 목록 (중앙부처 / 지자체 분리) -->
     <div id="benefits-list">
-      ${benefits.length ? benefits.map(b => renderBenefitCard(b)).join('') :
+      ${benefits.length ? renderBenefitsBySource(benefits) :
         APP.profile ? uiEmpty('🔍', '조건에 맞는 혜택이 없습니다', '프로필을 수정하거나 AI 분석을 시도해보세요') : ''}
     </div>
 
     <!-- 유사계층 분석 결과 -->
     <div id="cohort-result" class="mt20"></div>
   `;
+}
+
+// ── 중앙부처 / 지자체 분리 렌더 ─────────────────────────────────────
+function renderBenefitsBySource(benefits) {
+  const local   = benefits.filter(b => b.source === 'local');
+  const central = benefits.filter(b => b.source !== 'local');
+
+  const section = (label, color, items) => {
+    if (!items.length) return '';
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin:12px 0 8px">
+        <span style="font-size:.72rem;font-weight:700;color:${color};white-space:nowrap">${label}</span>
+        <span style="font-size:.7rem;color:var(--text-dim)">${items.length}건</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${items.map(b => renderBenefitCard(b)).join('')}
+      </div>`;
+  };
+
+  return section('중앙부처', 'var(--primary)', central)
+       + section('지자체', 'var(--secondary)', local);
 }
 
 function renderBenefitCard(b) {
@@ -130,7 +152,7 @@ function filterBenefits(filter, btn) {
   const listEl = document.getElementById('benefits-list');
   if (listEl) {
     listEl.innerHTML = filtered.length
-      ? filtered.map(b => renderBenefitCard(b)).join('')
+      ? renderBenefitsBySource(filtered)
       : uiEmpty('🔍', '해당 카테고리 혜택이 없습니다');
   }
 }
@@ -496,6 +518,7 @@ function apiItemToLocal(item) {
     processDays: 30,
     matchScore: 80,
     fromAPI: true,
+    source: item._src || 'central', // 'central' | 'local'
   };
 }
 
@@ -608,7 +631,10 @@ async function fetchWelfareWithFallback(extracted, profile, originalQuery) {
     const data = await res.json();
     console.log(`[AI검색] ${i+1}차 응답:`, data.success, 'items:', data.items?.length, data.error || '');
 
-    if (data.success && data.items?.length > 0) return data.items;
+    if (data.success && data.items?.length > 0) {
+      // source 태깅
+      return data.items.map(item => ({ ...item, _src: attempt.type || 'central' }));
+    }
     if (!data.success && data.error && !data.error.includes('NO DATA')) {
       throw new Error(data.error);
     }
@@ -700,17 +726,19 @@ function renderSearchResults() {
       <div style="font-size:.78rem;color:var(--text-muted)">다른 표현으로 다시 검색해보세요</div>
     </div>`;
 
-  if (status === 'done') return `
+  if (status === 'done') {
+    const central = results.filter(b => b.source !== 'local');
+    const local   = results.filter(b => b.source === 'local');
+    return `
     <div style="margin-top:14px">
       <!-- 결과 헤더 -->
-      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <span class="badge" style="background:rgba(0,192,115,.12);color:var(--success)">${esc(intent)}</span>
           ${_extractedParamBadges(extracted)}
-          <span style="font-size:.74rem;color:var(--text-muted)">${results.length}건</span>
+          <span style="font-size:.74rem;color:var(--text-muted)">총 ${results.length}건</span>
         </div>
-        <!-- 음성으로 듣기 버튼 (핵심 차별점) -->
-        <button onclick="readSearchResultsAloud()"
+        <button onclick="readSearchResultsAloud()" id="tts-btn"
           style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;
                  border:1.5px solid var(--success);background:rgba(0,192,115,.08);
                  color:var(--success);font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
@@ -722,10 +750,30 @@ function renderSearchResults() {
           음성으로 듣기
         </button>
       </div>
-      <div style="display:flex;flex-direction:column;gap:8px">
-        ${results.map(b => renderBenefitCard(b)).join('')}
-      </div>
+
+      <!-- 중앙부처 결과 -->
+      ${central.length ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:.72rem;font-weight:700;color:var(--primary);white-space:nowrap">중앙부처</span>
+          <span style="font-size:.7rem;color:var(--text-dim)">${central.length}건</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+          ${central.map(b => renderBenefitCard(b)).join('')}
+        </div>` : ''}
+
+      <!-- 지자체 결과 -->
+      ${local.length ? `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:.72rem;font-weight:700;color:var(--secondary);white-space:nowrap">지자체</span>
+          <span style="font-size:.7rem;color:var(--text-dim)">${local.length}건</span>
+          <div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${local.map(b => renderBenefitCard(b)).join('')}
+        </div>` : ''}
     </div>`;
+  }
 
   return '';
 }
@@ -745,45 +793,65 @@ function _extractedParamBadges(ex) {
   ].filter(Boolean).join('');
 }
 
-// ── 검색 결과 → TTS 음성 재생 ─────────────────────────────────────
-function readSearchResultsAloud() {
+// ── 검색 결과 → OpenAI TTS 음성 재생 ────────────────────────────
+async function readSearchResultsAloud() {
   const results = BenefitsSearch.results;
   if (!results.length) return;
 
-  const p     = APP.profile;
-  const name  = p?.name ? `${p.name}님, ` : '';
+  // 버튼 로딩 상태
+  const btn = document.getElementById('tts-btn');
+  if (btn) { btn.textContent = '불러오는 중...'; btn.disabled = true; }
+
+  const p      = APP.profile;
+  const name   = p?.name ? `${p.name}님, ` : '';
   const intent = BenefitsSearch.intent || '맞춤 복지';
 
-  // 음성 스크립트 생성
-  const intro  = `${name}${intent} 관련 혜택 ${results.length}가지를 안내해 드립니다.`;
+  const intro  = `${name}${intent} 관련 혜택 ${Math.min(results.length, 3)}가지를 안내해 드립니다.`;
   const items  = results.slice(0, 3).map((b, i) =>
-    `${i+1}번, ${b.name}입니다. ${b.agency}에서 지원하며, ${b.description || b.amount || '자세한 내용은 주민센터에 문의하세요.'}`
+    `${i+1}번째로, ${b.name}입니다. ${b.agency}에서 지원하며, ${b.description || b.amount || '자세한 내용은 주민센터에 문의하세요.'}`
   ).join(' ');
   const outro  = `신청은 복지로 홈페이지 또는 가까운 주민센터를 방문해 주세요.`;
-
   const script = `${intro} ${items} ${outro}`;
 
-  // voice.js의 TTS 활용
-  if (typeof Voice !== 'undefined' && Voice.synth) {
-    Voice.synth.cancel();
-    const utt = new SpeechSynthesisUtterance(script);
-    utt.lang = 'ko-KR';
-    utt.rate = 0.88;
-    Voice.synth.speak(utt);
-    toast('음성 안내를 시작합니다', 'success', 2000);
-  } else {
-    // voice.js 없으면 Web Speech API 직접 사용
-    if (!('speechSynthesis' in window)) { toast('이 브라우저는 음성을 지원하지 않습니다', 'warn'); return; }
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(script);
-    utt.lang = 'ko-KR'; utt.rate = 0.88;
-    window.speechSynthesis.speak(utt);
+  try {
+    // OpenAI TTS (voice.js의 함수 사용)
+    if (typeof openAITTS === 'function') {
+      const audio = await openAITTS(script);
+      audio.play();
+      toast('음성 안내를 시작합니다 (OpenAI TTS-HD)', 'success', 2000);
+      // voice 탭으로 이동해 스크립트 표시
+      navigateTo('voice');
+      setTimeout(() => {
+        if (typeof switchVoiceTab === 'function') switchVoiceTab('radio');
+        if (typeof Voice !== 'undefined') {
+          Voice.script  = script;
+          Voice.audioEl = audio;
+          Voice.isPlaying = true;
+          setVoiceUIState('playing');
+          const wrap = document.getElementById('voice-script-wrap');
+          const text = document.getElementById('voice-script-text');
+          if (wrap) wrap.style.display = 'block';
+          if (text) text.textContent = script;
+          audio.onended = () => { Voice.isPlaying = false; setVoiceUIState('done'); };
+        }
+      }, 250);
+    } else {
+      throw new Error('TTS 모듈 미로드');
+    }
+  } catch (e) {
+    console.warn('[TTS] 오류, Web Speech 폴백:', e);
+    if (typeof _speakWithWebSpeech === 'function') {
+      _speakWithWebSpeech(script);
+    } else {
+      window.speechSynthesis?.cancel();
+      const utt = new SpeechSynthesisUtterance(script);
+      utt.lang = 'ko-KR'; utt.rate = 0.88;
+      window.speechSynthesis.speak(utt);
+    }
     toast('음성 안내를 시작합니다', 'success', 2000);
   }
 
-  // 음성 페이지로 이동해 TTS 컨트롤 표시
-  navigateTo('voice');
-  setTimeout(() => { if (typeof switchVoiceTab === 'function') switchVoiceTab('radio'); }, 200);
+  if (btn) { btn.textContent = '음성으로 듣기'; btn.disabled = false; }
 }
 
 // ── 검색 결과 DOM 갱신 ────────────────────────────────────────────
