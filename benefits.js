@@ -13,41 +13,23 @@ function renderBenefitsPage() {
   const benefits = matched.length ? matched : APP.matchedBenefits;
 
   page.innerHTML = `
-    <div class="page-title grad-text">맞춤 복지 혜택</div>
-    <div class="page-sub">AI가 분석한 나만의 복지 혜택 목록</div>
+    <div class="page-title">맞춤 복지 혜택</div>
+    <div class="page-sub">규칙 기반으로 판정된 나만의 혜택 목록</div>
 
-    <!-- AI 에이전트 실행 패널 -->
-    <div class="agent-panel" id="agent-panel">
-      <div class="agent-header">
+    <!-- 복지에코 규칙 기반 자격 판정 패널 -->
+    <div class="card mb16" id="rule-match-panel">
+      <div class="section-header" style="margin-bottom:12px">
         <div>
-          <div class="agent-title">🤖 NVIDIA AI 멀티에이전트 분석</div>
-          <div class="agent-sub">4개의 전문 AI가 협력하여 맞춤 혜택을 분석합니다</div>
+          <div class="section-title">규칙 기반 자격 판정</div>
+          <div style="font-size:.76rem;color:var(--text-muted);margin-top:2px">자격 판정은 규칙 100% — AI 환각 없음</div>
         </div>
-        <button class="btn btn-primary btn-sm" id="btn-run-agents" onclick="handleRunAgents()">
-          ✨ AI 분석 시작
+        <button class="btn btn-primary btn-sm" id="btn-fetch-api" onclick="fetchWelfareAPI()">
+          실제 복지 조회
         </button>
       </div>
-      <div class="agents-grid">
-        ${Object.values(AGENTS_CONFIG).map(a => `
-          <div class="agent-card" id="agent-card-${a.id}">
-            <div class="agent-avatar">${a.avatar}</div>
-            <div class="agent-name">${a.name}</div>
-            <div class="agent-status">대기</div>
-          </div>`).join('')}
+      <div id="rule-match-summary">
+        ${APP.profile ? renderRuleMatchSummary(matched) : '<div style="color:var(--text-muted);font-size:.84rem">프로필 입력 후 자동 판정됩니다</div>'}
       </div>
-      <div class="agent-log" id="agent-log">
-        <div class="agent-log-line info">[준비] AI 에이전트를 시작하려면 위 버튼을 클릭하세요</div>
-      </div>
-    </div>
-
-    <!-- AI 결과 요약 (초기에는 숨김) -->
-    <div id="ai-benefits-result" class="card card-blue mb16 hidden">
-      <div class="section-header">
-        <div class="section-title">🎯 AI 분석 결과</div>
-        <div class="badge" style="background:rgba(16,185,129,.15);color:var(--success)">분석 완료</div>
-      </div>
-      <div style="font-size:1.2rem;font-weight:900;color:var(--primary)" id="ai-total-estimate"></div>
-      <div style="font-size:.85rem;color:var(--text-muted);margin-top:6px" id="ai-insight-text"></div>
     </div>
 
     <!-- 카테고리 필터 -->
@@ -63,10 +45,9 @@ function renderBenefitsPage() {
     <!-- 프로필 없을 때 안내 -->
     ${!APP.profile ? `
       <div class="card card-blue" style="text-align:center;padding:32px">
-        <div style="font-size:2.5rem;margin-bottom:12px">👤</div>
-        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">프로필이 없습니다</div>
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">프로필 미입력</div>
         <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">프로필을 입력하면 맞춤 혜택을 찾아드립니다</div>
-        <button class="btn btn-primary" onclick="navigateTo('profile')">📝 프로필 입력하기</button>
+        <button class="btn btn-primary" onclick="navigateTo('profile')">프로필 입력하기</button>
       </div>` : ''}
 
     <!-- 혜택 목록 -->
@@ -207,19 +188,121 @@ function openBenefitDetail(benefitId) {
   openModal('benefit-modal-overlay');
 }
 
-// ── AI 에이전트 실행 핸들러 ─────────────────────────────────────────
-async function handleRunAgents() {
-  if (!APP.profile) {
-    toast('먼저 프로필을 입력해주세요', 'warn');
-    navigateTo('profile');
-    return;
-  }
+// ── 규칙 매칭 요약 렌더 ────────────────────────────────────────────
+function renderRuleMatchSummary(matched) {
+  const easyCount = matched.filter(b => b.difficulty === 'easy').length;
+  const onlineCount = matched.filter(b => b.difficulty !== 'hard').length;
+  return `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">
+      <div style="text-align:center;flex:1;min-width:72px">
+        <div style="font-size:1.9rem;font-weight:900;color:var(--primary)">${matched.length}</div>
+        <div style="font-size:.73rem;color:var(--text-muted)">받을 수 있는 혜택</div>
+      </div>
+      <div style="text-align:center;flex:1;min-width:72px">
+        <div style="font-size:1.9rem;font-weight:900;color:var(--success)">${easyCount}</div>
+        <div style="font-size:.73rem;color:var(--text-muted)">간편 신청 가능</div>
+      </div>
+      <div style="text-align:center;flex:1;min-width:72px">
+        <div style="font-size:1.9rem;font-weight:900;color:var(--warn)">${onlineCount}</div>
+        <div style="font-size:.73rem;color:var(--text-muted)">온라인 신청 가능</div>
+      </div>
+    </div>
+    <div id="api-fetch-status" style="font-size:.76rem;color:var(--text-dim)">
+      ※ '실제 복지 조회'를 누르면 공공데이터포털 최신 복지 목록을 가져옵니다
+    </div>`;
+}
 
-  // NVIDIA API 키가 있으면 실제 API 사용, 없으면 데모 모드
-  if (APP.settings.nvidiaKey) {
-    await AgentOrchestrator.runAll(APP.profile);
-  } else {
-    toast('데모 모드로 실행합니다. 실제 분석은 설정에서 NVIDIA API 키를 입력하세요.', 'info', 4000);
-    await runDemoAgents(APP.profile);
+// ── 실제 복지 API 연동 (공공데이터포털 → 규칙 매칭 보완) ──────────────
+async function fetchWelfareAPI() {
+  const p = APP.profile;
+  if (!p) { toast('프로필을 먼저 입력해주세요', 'warn'); navigateTo('profile'); return; }
+
+  const btn = document.getElementById('btn-fetch-api');
+  const statusEl = document.getElementById('api-fetch-status');
+  if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
+  if (statusEl) statusEl.textContent = '공공데이터포털에서 복지 데이터를 가져오는 중...';
+
+  const params = new URLSearchParams({
+    type: 'central',
+    rows: '30',
+    lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
+  });
+  const trgCode = profileToTrgCode(p);
+  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+
+  try {
+    const res = await fetch(`/api/welfare?${params}`);
+    const data = await res.json();
+
+    if (data.success && data.items?.length) {
+      const apiMatched = data.items.map(apiItemToLocal);
+      const merged = mergeAndDedupe(APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits(), apiMatched);
+      saveBenefits(merged);
+      renderBenefitsPage();
+      toast(`실제 복지 데이터 ${data.items.length}건 조회 완료!`, 'success', 3000);
+    } else {
+      const msg = data.error || data.message || '연결 실패';
+      if (statusEl) statusEl.textContent = `⚠️ API 미연결 (${msg}) — 로컬 데이터만 표시`;
+      if (btn) { btn.disabled = false; btn.textContent = '🔄 실제 복지 조회'; }
+      toast('API 미연결 — 로컬 데이터만 표시됩니다', 'warn', 3000);
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = `조회 실패: ${e.message}`;
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 실제 복지 조회'; }
   }
+}
+
+// ── 프로필 → API 코드 변환 ──────────────────────────────────────────
+function ageToLifeCode(age, pregnant) {
+  if (pregnant) return '007';
+  if (age <= 6)  return '001'; // 영유아
+  if (age <= 12) return '002'; // 아동
+  if (age <= 18) return '003'; // 청소년
+  if (age <= 34) return '004'; // 청년
+  if (age <= 64) return '005'; // 중장년
+  return '006';                // 노년
+}
+
+function profileToTrgCode(p) {
+  if (p.disability) return '040';
+  if (parseInt(p.incomePercent || 100) <= 50) return '050';
+  if (p.householdType === 'single-parent') return '060';
+  return '';
+}
+
+// ── API 응답 → 로컬 포맷 변환 ───────────────────────────────────────
+function apiItemToLocal(item) {
+  return {
+    id: item.servId || `api_${Math.random().toString(36).slice(2, 8)}`,
+    name: item.servNm || '복지서비스',
+    category: detectCategoryFromAPI(item),
+    amount: item.sprtCycNm || '지원 있음',
+    agency: item.jurMnofNm || '중앙부처',
+    description: item.servDgst || '',
+    conditions: {},
+    ageRange: [0, 120],
+    tags: (item.lifeArray || '').split(',').map(s => s.trim()).filter(Boolean),
+    documents: [],
+    applyUrl: item.servDtlLink || 'https://www.bokjiro.go.kr',
+    applyOffline: '주민센터',
+    difficulty: 'medium',
+    processDays: 30,
+    matchScore: 80,
+    fromAPI: true,
+  };
+}
+
+function detectCategoryFromAPI(item) {
+  const theme = item.intrsThemaArray || '';
+  if (theme.includes('일자리')) return 'employment';
+  if (theme.includes('주거'))   return 'housing';
+  if (theme.includes('신체건강') || theme.includes('임신')) return 'health';
+  if (theme.includes('보육') || theme.includes('교육'))    return 'education';
+  if (theme.includes('서민금융')) return 'income';
+  return 'income';
+}
+
+function mergeAndDedupe(local, apiItems) {
+  const ids = new Set(local.map(b => b.id));
+  return [...local, ...apiItems.filter(b => !ids.has(b.id))];
 }

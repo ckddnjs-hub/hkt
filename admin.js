@@ -46,7 +46,7 @@ function renderAdminPage() {
 
       <!-- 사각지대 요약 카드 3종 -->
       <div class="section-header mt4">
-        <div class="section-title">📊 사각지대 현황 — ${esc(Admin.region)}</div>
+        <div class="section-title">사각지대 현황 — ${esc(Admin.region)}</div>
         <div class="badge" style="background:rgba(239,68,68,.12);color:#EF4444;font-size:.7rem">추정치 · KOSIS 기반</div>
       </div>
       <div class="admin-blind-spot-grid">
@@ -61,7 +61,7 @@ function renderAdminPage() {
       <!-- AI 사각지대 분석 -->
       <div class="card mt8">
         <div class="section-header" style="margin-bottom:10px">
-          <div class="section-title">🤖 AI 사각지대 분석</div>
+          <div class="section-title">AI 사각지대 분석</div>
           <button class="btn btn-sm btn-primary" id="btn-analyze" onclick="runBlindSpotAnalysis()">
             분석 시작
           </button>
@@ -69,14 +69,14 @@ function renderAdminPage() {
         <div id="admin-ai-result">
           <div style="font-size:.83rem;color:var(--text-muted);line-height:1.6;padding:8px 0">
             AI가 지역 데이터를 분석하여 사각지대 원인과 우선 개입 전략을 제안합니다.<br>
-            NVIDIA API 키가 없으면 데모 분석이 제공됩니다.
+            <span style="font-size:.76rem;color:var(--text-dim)">※ 자격 판정은 규칙 기반으로 처리됩니다. AI는 전략 제안 보조 역할입니다.</span>
           </div>
         </div>
       </div>
 
       <!-- 우선 발굴 대상 -->
       <div class="section-header mt8">
-        <div class="section-title">🚨 우선 발굴 대상</div>
+        <div class="section-title">우선 발굴 대상</div>
         <div style="display:flex;gap:6px">
           <button class="admin-filter-btn active" onclick="filterTargets('all', this)">전체</button>
           <button class="admin-filter-btn" onclick="filterTargets('high', this)">고위험</button>
@@ -96,25 +96,25 @@ function renderAdminPage() {
         ${DEADLINE_BENEFITS.map(b => renderDeadlineCard(b)).join('')}
       </div>
 
-      <!-- 긴급 방송 원클릭 버튼 -->
+      <!-- 복지 고지 빠른 방송 -->
       <div class="section-header mt8">
-        <div class="section-title">🚨 긴급 방송 빠른 발송</div>
-        <div class="badge" style="background:rgba(239,68,68,.12);color:#EF4444;font-size:.7rem">원클릭 발송</div>
+        <div class="section-title">복지 고지 빠른 방송</div>
+        <div class="badge" style="background:rgba(99,102,241,.12);color:var(--accent);font-size:.7rem">원클릭 생성</div>
       </div>
       <div class="card" style="padding:12px;margin-bottom:8px">
-        <div style="font-size:.77rem;color:var(--text-muted);margin-bottom:10px">자주 사용하는 긴급 방송을 한 번에 생성·발송합니다</div>
+        <div style="font-size:.77rem;color:var(--text-muted);margin-bottom:10px">자주 안내하는 복지 혜택을 즉시 쉬운말 방송문으로 생성합니다</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="emergency-quick-btn" style="background:rgba(239,68,68,.12);color:#EF4444" onclick="quickEmergencyBroadcast('heatwave')">
-            <span style="font-size:1.4rem">🌡️</span>폭염 경보
+          <button class="emergency-quick-btn" style="background:rgba(99,102,241,.12);color:#6366F1" onclick="quickWelfareBroadcast('pension')">
+            <span style="font-size:1.2rem">👴</span>기초연금
           </button>
-          <button class="emergency-quick-btn" style="background:rgba(99,102,241,.12);color:#6366F1" onclick="quickEmergencyBroadcast('typhoon')">
-            <span style="font-size:1.4rem">🌀</span>태풍 대피
+          <button class="emergency-quick-btn" style="background:rgba(59,130,246,.12);color:#3B82F6" onclick="quickWelfareBroadcast('rent')">
+            <span style="font-size:1.2rem">🏠</span>청년 월세
           </button>
-          <button class="emergency-quick-btn" style="background:rgba(59,130,246,.12);color:#3B82F6" onclick="quickEmergencyBroadcast('coldwave')">
-            <span style="font-size:1.4rem">❄️</span>한파 주의
+          <button class="emergency-quick-btn" style="background:rgba(245,158,11,.12);color:#F59E0B" onclick="quickWelfareBroadcast('energy')">
+            <span style="font-size:1.2rem">💡</span>에너지바우처
           </button>
-          <button class="emergency-quick-btn" style="background:rgba(107,114,128,.12);color:#9CA3AF" onclick="quickEmergencyBroadcast('dust')">
-            <span style="font-size:1.4rem">😷</span>미세먼지
+          <button class="emergency-quick-btn" style="background:rgba(239,68,68,.12);color:#EF4444" onclick="quickWelfareBroadcast('urgent')">
+            <span style="font-size:1.2rem">🆘</span>긴급복지
           </button>
         </div>
       </div>
@@ -124,7 +124,7 @@ function renderAdminPage() {
         <div style="display:flex;align-items:center;gap:12px">
           <div style="font-size:1.4rem">📣</div>
           <div style="flex:1">
-            <div style="font-size:.88rem;font-weight:700">사각지대 발굴 방송문 자동 생성</div>
+            <div style="font-size:.88rem;font-weight:700">발굴 현황 기반 방송문 자동 생성</div>
             <div style="font-size:.77rem;color:var(--text-muted);margin-top:2px">위 데이터 기반으로 이달 방송문을 AI가 작성합니다</div>
           </div>
           <button class="btn btn-primary btn-sm" onclick="generateAdminBroadcast()">생성</button>
@@ -133,7 +133,7 @@ function renderAdminPage() {
 
       <!-- KOSIS 연동 안내 -->
       <div class="card" style="background:var(--bg2);margin-bottom:16px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--text-dim);margin-bottom:8px">📡 KOSIS 공공데이터 연동</div>
+        <div style="font-size:.78rem;font-weight:700;color:var(--text-dim);margin-bottom:8px">KOSIS 공공데이터 연동</div>
         <div style="font-size:.77rem;color:var(--text-muted);line-height:1.7;margin-bottom:10px">
           실시간 인구·수급 통계를 불러오려면 KOSIS API 키를 설정하세요.<br>
           <a href="https://kosis.kr/openapi/" target="_blank" style="color:var(--primary)">kosis.kr/openapi</a>에서 무료 발급 가능합니다.
@@ -382,13 +382,10 @@ async function runBlindSpotAnalysis() {
       disability: stats.disability.eligible - stats.disability.recipients,
     };
 
-    const nvidiaKey = APP.settings.nvidiaKey;
     let analysis;
-
-    if (nvidiaKey) {
-      analysis = await fetchNvidiaBlindSpotAnalysis(Admin.region, stats, gap, nvidiaKey);
-    } else {
-      await new Promise(r => setTimeout(r, 1200));
+    try {
+      analysis = await fetchGPTBlindSpotAnalysis(Admin.region, stats, gap);
+    } catch (e) {
       analysis = getDemoBlindSpotAnalysis(Admin.region, stats, gap);
     }
 
@@ -405,8 +402,8 @@ async function runBlindSpotAnalysis() {
   }
 }
 
-// ── NVIDIA 사각지대 분석 API 호출 ────────────────────────────────────
-async function fetchNvidiaBlindSpotAnalysis(region, stats, gap, apiKey) {
+// ── GPT 사각지대 분석 (전략 제안 보조 — 자격 판정은 규칙 기반) ─────────
+async function fetchGPTBlindSpotAnalysis(region, stats, gap) {
   const prompt = `다음은 ${region} 지역의 복지 사각지대 현황 데이터입니다.
 
 기초연금: 추정 대상 ${fmtNum(stats.basicPension.eligible)}명 중 수급자 ${fmtNum(stats.basicPension.recipients)}명 → 미수급 ${fmtNum(gap.pension)}명
@@ -419,25 +416,25 @@ async function fetchNvidiaBlindSpotAnalysis(region, stats, gap, apiKey) {
 2. 이 지역에서 효과적인 발굴 전략 (구체적으로)
 3. 이장님·복지사가 이달 집중해야 할 우선순위 3가지
 
-200자 이내로 간결하게, 실무자가 바로 활용할 수 있도록 작성해주세요.`;
+400자 이내로 간결하게, 실무자가 바로 활용할 수 있도록 작성해주세요.`;
 
-  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'meta/llama-3.1-70b-instruct',
       messages: [
-        { role: 'system', content: '당신은 대한민국 사회복지 정책 전문가입니다. 복지 사각지대 발굴을 위한 실무적인 분석과 전략을 제공합니다.' },
+        { role: 'system', content: '당신은 대한민국 사회복지 정책 전문가입니다. 복지 사각지대 발굴을 위한 실무적인 분석과 전략을 제공합니다. 자격 판정은 규칙 기반으로 처리하며, 당신은 전략 제안만 담당합니다.' },
         { role: 'user', content: prompt },
       ],
-      temperature: 0.5, max_tokens: 600, stream: false,
+      temperature: 0.5,
+      max_tokens: 600,
     }),
     signal: AbortSignal.timeout(25000),
   });
 
-  if (!res.ok) throw new Error(`API ${res.status}`);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || getDemoBlindSpotAnalysis(region, stats, gap);
+  if (!data.success || !data.content) throw new Error(data.error || 'empty');
+  return data.content;
 }
 
 // ── 데모 분석 결과 ────────────────────────────────────────────────────
@@ -471,45 +468,6 @@ async function generateAdminBroadcast() {
   setTimeout(() => navigateTo('voice'), 1500);
 }
 
-// ── 긴급 방송 원클릭 ─────────────────────────────────────────────────
-function quickEmergencyBroadcast(type) {
-  const region = Admin.region || APP.profile?.region || '우리 동네';
-
-  const scripts = {
-    heatwave: {
-      cat: 'disaster',
-      text: `긴급 안내! ${region} 주민 여러분~\n\n폭염 경보가 발령되었습니다! 낮 12시~오후 5시 사이에는 외출을 자제해 주세요. 어르신과 어린이는 특히 조심하세요.\n\n가까운 무더위쉼터(마을회관·경로당)에서 더위를 피하시고, 물 자주 드세요. 응급상황은 119!`,
-    },
-    typhoon: {
-      cat: 'disaster',
-      text: `긴급 안내! ${region} 주민 여러분~\n\n태풍이 접근하고 있습니다! 지금 바로 외출을 자제하시고 창문을 단단히 닫아주세요.\n\n저지대·침수 위험 지역에 계신 분들은 즉시 마을회관으로 대피해 주세요. 긴급 상황은 재난안전 전화 119!`,
-    },
-    coldwave: {
-      cat: 'disaster',
-      text: `긴급 안내! ${region} 주민 여러분~\n\n한파 경보가 발령되었습니다! 수도 동파 예방을 위해 수도꼭지를 조금씩 틀어두시고 보일러를 확인해주세요.\n\n홀로 사시는 어르신들, 주변에 안부 확인 부탁드립니다. 도움 필요하시면 주민센터로 연락주세요!`,
-    },
-    dust: {
-      cat: 'weather',
-      text: `${region} 주민 여러분께 알립니다~\n\n오늘 미세먼지 농도가 매우 나쁨 수준입니다! 외출 시 반드시 마스크를 착용해주세요.\n\n어르신·어린이·호흡기 질환자는 외출을 자제하시고, 외출 후 손발을 깨끗이 씻어주세요!`,
-    },
-  };
-
-  const s = scripts[type];
-  if (!s) return;
-
-  VoiceBroadcast.category = s.cat;
-  VoiceBroadcast.convertedText = s.text;
-
-  toast('🚨 긴급 방송문이 생성되었습니다. AI 마을방송 탭에서 확인하세요!', 'success', 4000);
-  setTimeout(() => {
-    navigateTo('voice');
-    // 탭 전환 후 결과 표시
-    setTimeout(() => {
-      switchVoiceTab('broadcast');
-      showBroadcastResult(s.text);
-    }, 300);
-  }, 800);
-}
 
 // ── 숫자 포맷 ────────────────────────────────────────────────────────
 function fmtNum(n) {

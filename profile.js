@@ -21,7 +21,7 @@ function renderProfilePage() {
 
     <!-- 기본 정보 -->
     <div class="profile-section">
-      <div class="profile-section-title">👤 기본 정보</div>
+      <div class="profile-section-title">기본 정보</div>
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">이름</label>
@@ -52,7 +52,7 @@ function renderProfilePage() {
 
     <!-- 가구 정보 -->
     <div class="profile-section">
-      <div class="profile-section-title">🏠 가구 정보</div>
+      <div class="profile-section-title">가구 정보</div>
       <div class="form-group">
         <label class="form-label">가구 유형</label>
         <select class="form-select" id="pf-household-type">
@@ -93,7 +93,7 @@ function renderProfilePage() {
 
     <!-- 소득 정보 -->
     <div class="profile-section">
-      <div class="profile-section-title">💰 소득 정보</div>
+      <div class="profile-section-title">소득 정보</div>
       <div class="form-group">
         <label class="form-label">기준 중위소득 대비 (%)</label>
         <select class="form-select" id="pf-income">
@@ -126,7 +126,7 @@ function renderProfilePage() {
 
     <!-- 주거 정보 -->
     <div class="profile-section">
-      <div class="profile-section-title">🏡 주거 정보</div>
+      <div class="profile-section-title">주거 정보</div>
       <div class="form-group">
         <label class="form-label">주거 형태</label>
         <div class="toggle-group" id="pf-housing-group">
@@ -143,7 +143,7 @@ function renderProfilePage() {
 
     <!-- 건강/특수 상황 -->
     <div class="profile-section">
-      <div class="profile-section-title">💊 건강 및 특수 상황</div>
+      <div class="profile-section-title">건강 및 특수 상황</div>
       <div class="checkbox-group" id="pf-special-group">
         ${[
           ['disability', '장애 등록', '♿'],
@@ -162,10 +162,10 @@ function renderProfilePage() {
 
     <!-- 저장 버튼 -->
     <button class="btn btn-primary btn-full btn-lg mt20" id="btn-save-profile">
-      💾 프로필 저장하기
+      프로필 저장하기
     </button>
     <button class="btn btn-ghost btn-full mt8" id="btn-find-benefits" style="${APP.profile ? '' : 'display:none'}">
-      🎯 맞춤 혜택 찾기
+      맞춤 혜택 찾기
     </button>
   `;
 

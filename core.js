@@ -4,9 +4,10 @@
 const APP = {
   currentPage: 'home',
   profile: null,
-  settings: { nvidiaKey: '', claudeKey: '', kosisKey: '', theme: 'dark', notifications: false },
+  settings: { kosisKey: '', theme: 'dark', notifications: false },
   matchedBenefits: [],
   isOnboarded: false,
+  userMode: 'recipient', // 'recipient'(당사자) | 'deliverer'(전달자)
 };
 
 // ── 로컬스토리지 키 ──────────────────────────────────────────────────
@@ -15,6 +16,7 @@ const LS = {
   SETTINGS: 'bokjion_settings',
   BENEFITS: 'bokjion_benefits',
   ONBOARDED: 'bokjion_onboarded',
+  MODE: 'bokjion_mode',
 };
 
 // ── 초기화 ──────────────────────────────────────────────────────────
@@ -70,6 +72,7 @@ function loadPersistedData() {
     if (b) APP.matchedBenefits = JSON.parse(b);
 
     APP.isOnboarded = localStorage.getItem(LS.ONBOARDED) === 'true';
+    APP.userMode = localStorage.getItem(LS.MODE) || 'recipient';
   } catch (e) {
     console.warn('데이터 로드 실패:', e);
   }
@@ -96,18 +99,29 @@ function setOnboarded() {
   localStorage.setItem(LS.ONBOARDED, 'true');
 }
 
+function setUserMode(mode) {
+  APP.userMode = mode;
+  localStorage.setItem(LS.MODE, mode);
+}
+
 // ── 온보딩 ──────────────────────────────────────────────────────────
 function showOnboarding() {
   document.getElementById('loading-screen').classList.add('hidden');
   document.getElementById('onboarding-page').classList.add('show');
 }
 
-function startApp() {
+function startApp(mode) {
   setOnboarded();
+  setUserMode(mode || 'recipient');
   document.getElementById('onboarding-page').classList.remove('show');
   showApp();
-  navigateTo('profile');
-  toast('프로필을 먼저 입력해주세요! 맞춤 혜택을 찾아드릴게요.', 'info', 4000);
+  if (mode === 'deliverer') {
+    navigateTo('admin');
+    toast('전달자 모드로 시작합니다. 사각지대 발굴과 방송 스크립트를 활용하세요.', 'info', 4000);
+  } else {
+    navigateTo('profile');
+    toast('프로필을 입력하면 규칙 기반으로 받을 수 있는 혜택을 찾아드립니다.', 'info', 4000);
+  }
 }
 
 // ── 앱 표시 ─────────────────────────────────────────────────────────
@@ -124,9 +138,9 @@ function showApp() {
 
 // ── 페이지 타이틀 맵 ─────────────────────────────────────────────────
 const PAGE_TITLES = {
-  home: '대시보드', profile: '내 정보', benefits: '맞춤 혜택',
+  home: '복지에코', profile: '내 정보', benefits: '맞춤 혜택',
   news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드',
-  settings: '설정', chat: 'AI 복지 상담', voice: 'AI 마을방송',
+  settings: '설정', chat: 'AI 복지 상담', voice: '방송·음성 안내',
   admin: '사각지대 발굴',
 };
 

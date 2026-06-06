@@ -19,12 +19,12 @@ function renderChatPage() {
       <!-- 채팅 헤더 -->
       <div class="chat-header">
         <div class="chat-agent-info">
-          <div class="chat-agent-avatar">🤖</div>
+          <div class="chat-agent-avatar" style="font-size:.85rem;font-weight:900;color:var(--primary)">AI</div>
           <div>
-            <div class="chat-agent-name">복지ON AI 상담사</div>
+            <div class="chat-agent-name">복지에코 AI 상담사</div>
             <div class="chat-agent-status">
               <span class="status-dot"></span>
-              NVIDIA NIM 멀티에이전트 기반
+              규칙 매칭 · AI 쉬운말 변환
             </div>
           </div>
         </div>
@@ -50,7 +50,7 @@ function renderChatPage() {
           <textarea
             id="chat-input"
             class="chat-input"
-            placeholder="복지 혜택에 대해 물어보세요... (🎤 마이크로 말해도 됩니다)"
+            placeholder="복지 혜택에 대해 물어보세요... (마이크로 말해도 됩니다)"
             rows="1"
             onkeydown="handleChatKey(event)"
             oninput="autoResizeTextarea(this)"
@@ -70,7 +70,7 @@ function renderChatPage() {
             </svg>
           </button>
         </div>
-        <div class="chat-input-hint">🎤 음성 입력 가능 · NVIDIA AI 복지 상담</div>
+        <div class="chat-input-hint">음성 입력 가능 · AI 복지 상담</div>
       </div>
     </div>
   `;
@@ -84,15 +84,14 @@ function renderChatWelcome() {
   const name = APP.profile?.name ? `${APP.profile.name}님, ` : '';
   return `
     <div class="chat-welcome">
-      <div class="chat-welcome-logo">🏛️</div>
+      <div class="chat-welcome-logo" style="font-size:1.1rem;font-weight:900;color:var(--primary);letter-spacing:-.02em">복지에코</div>
       <div class="chat-welcome-title">안녕하세요!</div>
       <div class="chat-welcome-sub">
-        ${name}저는 NVIDIA AI 기반 복지 상담사입니다.<br>
+        ${name}저는 복지에코 AI 상담사입니다.<br>
         어떤 복지 혜택이 궁금하신가요?
       </div>
       ${!APP.profile ? `
         <div class="chat-profile-hint">
-          <span>💡</span>
           <span>프로필을 입력하면 더 정확한 맞춤 상담이 가능합니다</span>
           <button class="btn btn-sm btn-ghost" onclick="navigateTo('profile')">프로필 입력 →</button>
         </div>` : ''}
@@ -131,7 +130,7 @@ function renderMessage(msg) {
   // assistant
   return `
     <div class="chat-msg chat-msg-assistant">
-      <div class="chat-avatar-sm">🤖</div>
+      <div class="chat-avatar-sm" style="font-size:.72rem;font-weight:900;color:var(--primary)">AI</div>
       <div class="chat-msg-body">
         <div class="chat-bubble chat-bubble-assistant">${formatAIResponse(msg.content)}</div>
         ${msg.cards?.length ? `
@@ -224,7 +223,7 @@ async function sendChatMessage(overrideText) {
     removeTypingIndicator();
     const errMsg = {
       role: 'assistant',
-      content: '죄송합니다, 잠시 오류가 발생했습니다. 다시 시도해주세요.\n\n설정에서 NVIDIA API 키를 확인해주세요.',
+      content: '죄송합니다, 잠시 오류가 발생했습니다. 다시 시도해주세요.',
       time: nowTime(),
     };
     Chat.messages.push(errMsg);
@@ -249,43 +248,31 @@ function appendMessage(msg) {
 
 // ── AI 응답 생성 ───────────────────────────────────────────────────
 async function getAIReply(userText) {
-  const nvidiaKey = APP.settings.nvidiaKey;
-
-  // 관련 혜택 로컬 매칭 (키워드 기반)
+  // 관련 혜택 로컬 매칭 — 규칙 기반, LLM 미사용
   const relatedBenefits = findRelatedBenefits(userText);
 
-  // 컨텍스트 빌드 (최초 1회 또는 프로필 변경 시)
   const systemPrompt = buildChatSystemPrompt();
   const messages = [
     { role: 'system', content: systemPrompt },
     ...Chat.messages.slice(-8).map(m => ({ role: m.role, content: m.content })),
   ];
 
-  if (!nvidiaKey) {
-    // 데모 모드: 로컬 응답 생성
-    return { reply: generateDemoReply(userText, relatedBenefits), relatedBenefits };
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages, temperature: 0.7, max_tokens: 800 }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = await res.json();
+    if (data.success && data.content) {
+      return { reply: data.content, relatedBenefits };
+    }
+  } catch (e) {
+    console.warn('[Chat] GPT API 실패, 데모 모드:', e);
   }
 
-  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${nvidiaKey}`,
-    },
-    body: JSON.stringify({
-      model: 'meta/llama-3.1-70b-instruct',
-      messages,
-      temperature: 0.7,
-      max_tokens: 800,
-      stream: false,
-    }),
-    signal: AbortSignal.timeout(30000),
-  });
-
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  const data = await res.json();
-  const reply = data.choices?.[0]?.message?.content || '답변을 생성할 수 없습니다.';
-  return { reply, relatedBenefits };
+  return { reply: generateDemoReply(userText, relatedBenefits), relatedBenefits };
 }
 
 // ── 시스템 프롬프트 빌드 ───────────────────────────────────────────
@@ -302,8 +289,8 @@ function buildChatSystemPrompt() {
 현재 매칭된 혜택 (${matched.length}개): ${matched.map(b => b.name).join(', ')}
 ` : '(프로필 미입력)';
 
-  return `당신은 대한민국 복지 혜택 전문 AI 상담사입니다.
-NVIDIA AI 멀티에이전트 시스템의 일부로 동작합니다.
+  return `당신은 대한민국 복지 혜택 전문 AI 상담사입니다 — 복지에코 서비스.
+자격 판단은 규칙 기반 엔진이 처리하며, 당신은 쉬운 말 안내와 상담 흐름을 담당합니다.
 
 ${profileInfo}
 

@@ -1,7 +1,7 @@
 {
-  "name": "복지ON - AI 맞춤형 복지 혜택",
-  "short_name": "복지ON",
-  "description": "NVIDIA AI 멀티에이전트가 찾아주는 나만의 복지 혜택 플랫폼",
+  "name": "복지에코 - 복지 도달 AI 서비스",
+  "short_name": "복지에코",
+  "description": "AI가 찾아서 쉬운 말로 전달하는 복지 도달 서비스. 규칙 기반 자격 판정 + AI 쉬운말 변환 + 마을방송 스크립트.",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -27,15 +27,15 @@
     {
       "name": "혜택 찾기",
       "short_name": "혜택",
-      "description": "AI 맞춤 복지 혜택 검색",
+      "description": "규칙 기반 자격 판정으로 받을 수 있는 복지 찾기",
       "url": "/?page=benefits",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "생애 계획",
-      "short_name": "생애",
-      "description": "생애주기별 복지 플랜",
-      "url": "/?page=lifecycle",
+      "name": "AI 상담",
+      "short_name": "상담",
+      "description": "음성·텍스트로 복지 상담",
+      "url": "/?page=chat",
       "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
     }
   ]

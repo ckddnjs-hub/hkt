@@ -33,10 +33,10 @@ function renderVoicePage() {
       <!-- 탭 네비게이션 -->
       <div class="voice-tabs">
         <button class="voice-tab active" id="vtab-broadcast" onclick="switchVoiceTab('broadcast')">
-          📣 AI 마을방송
+          📣 전달자 모드
         </button>
         <button class="voice-tab" id="vtab-radio" onclick="switchVoiceTab('radio')">
-          📻 맞춤 라디오
+          🎤 당사자 모드
         </button>
       </div>
 
@@ -46,7 +46,7 @@ function renderVoicePage() {
         <div class="card" style="margin-bottom:12px">
           <div class="section-header" style="margin-bottom:12px">
             <div class="section-title">공문 → 쉬운 말 변환</div>
-            <div class="badge" style="background:rgba(16,185,129,.15);color:#10B981;font-size:.7rem">이장님 · 복지사용</div>
+            <div class="badge" style="background:rgba(16,185,129,.15);color:#10B981;font-size:.7rem">이장 · 복지사 · 생활지원사</div>
           </div>
 
           <!-- 방송 유형 카테고리 -->
@@ -143,7 +143,7 @@ function renderVoicePage() {
         <!-- 라디오 헤더 -->
         <div class="voice-header">
           <div class="voice-badge">LIVE</div>
-          <div class="voice-station">${esc(region)} 복지 라디오</div>
+          <div class="voice-station">${esc(region)} 복지에코 음성 안내</div>
           <div class="voice-date">${getTodayLabel()}</div>
         </div>
 
@@ -211,7 +211,7 @@ function renderVoicePage() {
 
         <div class="voice-accessibility-note">
           <span>♿</span>
-          <span>어르신 · 시각 약자를 위한 음성 복지 서비스입니다</span>
+          <span>어르신 · 디지털 취약계층을 위한 음성 복지 안내 서비스입니다</span>
         </div>
 
       </div><!-- /voice-tab-radio -->
@@ -309,32 +309,26 @@ function speakText(text) {
 // ── 스크립트 빌드 ─────────────────────────────────────────────────
 async function buildVoiceScript() {
   const p = APP.profile;
-  const nvidiaKey = APP.settings.nvidiaKey;
-
-  if (nvidiaKey && p) {
-    try {
-      return await buildScriptWithNvidia(p, nvidiaKey);
-    } catch (e) {
-      console.warn('[Voice] NVIDIA 실패, 데모 모드:', e);
-    }
+  try {
+    return await buildScriptWithGPT(p);
+  } catch (e) {
+    console.warn('[Voice] GPT 실패, 데모 모드:', e);
+    return buildDemoScript(p);
   }
-  return buildDemoScript(p);
 }
 
-// ── NVIDIA NIM으로 스크립트 생성 ─────────────────────────────────
-async function buildScriptWithNvidia(profile, apiKey) {
+// ── GPT로 복지 라디오 스크립트 생성 ──────────────────────────────
+async function buildScriptWithGPT(profile) {
   const news = getVoiceNewsList(profile);
   const benefits = (APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits()).slice(0, 3);
-  const region = profile.region || '우리 동네';
-  const name = profile.name || '주민';
+  const region = profile?.region || '우리 동네';
+  const name = profile?.name || '주민';
 
   const prompt = `다음 조건에 맞는 복지 라디오 방송 스크립트를 작성해주세요.
 
 청취자 정보:
-- 이름: ${name}님
-- 지역: ${region}
-- 나이: ${profile.age}세
-- 상황: ${[profile.disability&&'장애인',profile.elderly&&'노인부양',profile.hasChildren&&'자녀있음',profile.pregnant&&'임신중'].filter(Boolean).join(', ')||'일반'}
+- 이름: ${name}님 / 지역: ${region} / 나이: ${profile?.age || ''}세
+- 상황: ${[profile?.disability&&'장애인',profile?.elderly&&'노인부양',profile?.hasChildren&&'자녀있음',profile?.pregnant&&'임신중'].filter(Boolean).join(', ')||'일반'}
 
 오늘의 혜택 소식:
 ${benefits.map(b => `- ${b.name}: ${b.amount}`).join('\n')}
@@ -343,36 +337,27 @@ ${benefits.map(b => `- ${b.name}: ${b.amount}`).join('\n')}
 ${news.slice(0,3).map(n => `- ${n.title}`).join('\n')}
 
 요구사항:
-- 라디오 방송처럼 따뜻하고 친근하게 읽어줄 수 있는 문장으로 작성
-- "안녕하세요, ${name}님!" 으로 시작
-- 지역명(${region})을 언급
-- 핵심 혜택 2~3개를 쉽게 설명
-- 신청 방법(복지로 또는 주민센터)으로 마무리
-- 총 300~400자, 말로 읽으면 1분 30초 분량
-- 한국어, 존댓말, 이해하기 쉬운 단어만 사용`;
+- "안녕하세요, ${name}님!" 으로 시작, 지역명(${region}) 언급
+- 핵심 혜택 2~3개를 쉬운 말로 설명, 신청 방법(복지로 또는 주민센터)으로 마무리
+- 총 300~400자, 한국어 존댓말, 이해하기 쉬운 단어만 사용`;
 
-  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'meta/llama-3.1-70b-instruct',
       messages: [
         { role: 'system', content: '당신은 따뜻한 복지 라디오 방송 작가입니다. 어르신도 이해하기 쉬운 말로 복지 혜택을 안내하는 방송 스크립트를 작성합니다.' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.8,
       max_tokens: 600,
-      stream: false,
     }),
     signal: AbortSignal.timeout(20000),
   });
 
-  if (!res.ok) throw new Error(`API ${res.status}`);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || buildDemoScript(profile);
+  if (!data.success || !data.content) throw new Error(data.error || 'empty response');
+  return data.content;
 }
 
 // ── 데모 스크립트 생성 ────────────────────────────────────────────
@@ -595,13 +580,7 @@ async function convertNotice() {
   VoiceBroadcast.originalText = text;
 
   try {
-    const nvidiaKey = APP.settings.nvidiaKey;
-    if (nvidiaKey) {
-      VoiceBroadcast.convertedText = await convertWithNvidia(text, nvidiaKey);
-    } else {
-      await new Promise(r => setTimeout(r, 900)); // 데모 딜레이
-      VoiceBroadcast.convertedText = convertNoticeDemo(text);
-    }
+    VoiceBroadcast.convertedText = await convertWithGPT(text);
     showBroadcastResult(VoiceBroadcast.convertedText);
   } catch (e) {
     VoiceBroadcast.convertedText = convertNoticeDemo(text);
@@ -612,8 +591,8 @@ async function convertNotice() {
   }
 }
 
-// ── NVIDIA로 변환 ─────────────────────────────────────────────────
-async function convertWithNvidia(text, apiKey) {
+// ── GPT로 마을방송 변환 ────────────────────────────────────────────
+async function convertWithGPT(text) {
   const region = APP.profile?.region || '우리 동네';
   const cat = VoiceBroadcast.category || 'welfare';
   const catInfo = BROADCAST_CATEGORIES.find(c => c.id === cat) || {};
@@ -625,11 +604,8 @@ async function convertWithNvidia(text, apiKey) {
 
   const categoryGuide = {
     welfare:  '복지 혜택 안내 — 어르신도 이해하기 쉬운 따뜻한 말투, 신청처(주민센터/복지로) 안내 포함',
-    disaster: '재난·안전 안내 — 즉각 행동 요령 중심, 대피 장소·연락처 포함, 간결하고 명확하게',
     health:   '건강·의료 안내 — 대상자와 장소·시간 명확히, 무료 여부 강조',
-    weather:  '기상 특보 안내 — 수치(기온·강수량 등) 포함, 주의사항·행동 지침 중심',
     life:     '생활 안내 — 영향 시간대와 대처 방법 중심, 불편 최소화 안내',
-    agri:     '농어업 안내 — 작업 시간·장소·준비물 중심, 참여 방법 안내',
   }[cat] || '주민 안내';
 
   const prompt = `${urgentPrefix}다음 행정 공문을 마을 방송 멘트로 변환해주세요.
@@ -649,25 +625,23 @@ async function convertWithNvidia(text, apiKey) {
 
 변환된 방송문만 출력하세요.`;
 
-  const res = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+  const res = await fetch('/api/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'meta/llama-3.1-70b-instruct',
       messages: [
         { role: 'system', content: '당신은 지역 공공 AI 방송 작가입니다. 행정 공문을 주민이 바로 이해하고 행동할 수 있는 마을 방송 멘트로 변환합니다.' },
         { role: 'user', content: prompt },
       ],
       temperature: isUrgent ? 0.5 : 0.75,
       max_tokens: 400,
-      stream: false,
     }),
     signal: AbortSignal.timeout(20000),
   });
 
-  if (!res.ok) throw new Error(`API ${res.status}`);
   const data = await res.json();
-  return data.choices?.[0]?.message?.content || convertNoticeDemo(text);
+  if (!data.success || !data.content) throw new Error(data.error || 'empty response');
+  return data.content;
 }
 
 // ── 데모 변환 (API 키 없을 때) ───────────────────────────────────

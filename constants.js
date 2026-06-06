@@ -378,14 +378,11 @@ const DEADLINE_BENEFITS = [
   { name: '긴급복지지원', deadline: '상시', dday: null, category: 'income', desc: '위기상황 발생 시 즉시 신청' },
 ];
 
-// ── 방송 카테고리 ─────────────────────────────────────────────────────
+// ── 방송 카테고리 (복지에코 범위: 복지 도달 집중) ─────────────────────
 const BROADCAST_CATEGORIES = [
-  { id: 'welfare',  label: '복지 혜택', icon: '🎁', color: '#3B82F6', urgency: 'normal' },
-  { id: 'disaster', label: '재난·안전', icon: '🚨', color: '#EF4444', urgency: 'high'   },
-  { id: 'health',   label: '건강·의료', icon: '💉', color: '#10B981', urgency: 'normal' },
-  { id: 'weather',  label: '기상 특보', icon: '🌪️', color: '#F59E0B', urgency: 'high'   },
-  { id: 'life',     label: '생활 안내', icon: '🏘️', color: '#8B5CF6', urgency: 'normal' },
-  { id: 'agri',     label: '농어업',   icon: '🌾', color: '#84CC16', urgency: 'normal' },
+  { id: 'welfare', label: '복지 혜택', icon: '🎁', color: '#3B82F6', urgency: 'normal' },
+  { id: 'health',  label: '건강·의료', icon: '💉', color: '#10B981', urgency: 'normal' },
+  { id: 'life',    label: '생활 안내', icon: '🏘️', color: '#8B5CF6', urgency: 'normal' },
 ];
 
 // ── 카테고리별 방송 템플릿 ─────────────────────────────────────────────
