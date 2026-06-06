@@ -360,7 +360,21 @@ function renderRuleMatchSummary(matched) {
     </div>`;
 }
 
-// ── 실제 복지 API 연동 (공공데이터포털 → 규칙 매칭 보완) ──────────────
+// ── 프로필 기반 공통 파라미터 빌더 ────────────────────────────────
+// fetchWelfareAPI, runWelfareAPICheck, autoFetch 모두 여기서 파라미터를 만듦
+function buildProfileParams(profile, rows = '100') {
+  const p = profile;
+  const params = new URLSearchParams({ type: 'central', rows });
+  if (p?.age) {
+    params.set('lifeArray', ageToLifeCode(parseInt(p.age), p?.pregnant));
+    params.set('age', String(parseInt(p.age)));
+  }
+  const trgCode = p ? profileToTrgCode(p) : '';
+  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+  return params;
+}
+
+// ── 실제 복지 API 연동 ──────────────────────────────────────────────
 async function fetchWelfareAPI() {
   const p = APP.profile;
   if (!p) { toast('프로필을 먼저 입력해주세요', 'warn'); navigateTo('profile'); return; }
@@ -368,40 +382,34 @@ async function fetchWelfareAPI() {
   const btn = document.getElementById('btn-fetch-api');
   const statusEl = document.getElementById('api-fetch-status');
   if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
-  if (statusEl) statusEl.textContent = '공공데이터포털에서 복지 데이터를 가져오는 중...';
-
-  const params = new URLSearchParams({
-    type: 'central',
-    rows: '30',
-    lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
-  });
-  if (p.age) params.set('age', String(parseInt(p.age)));
-  const trgCode = profileToTrgCode(p);
-  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+  if (statusEl) statusEl.textContent = '복지 데이터를 가져오는 중...';
 
   try {
-    const res = await fetch(`/api/welfare?${params}`);
+    const res = await fetch(`/api/welfare?${buildProfileParams(p, '100')}`);
     const data = await res.json();
 
-    if (data.success && data.items?.length) {
-      const apiMatched = data.items.map(apiItemToLocal);
-      const merged = mergeAndDedupe(APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits(), apiMatched);
+    if (data.success) {
+      const apiItems = (data.items || []).map(apiItemToLocal);
+      // API 결과를 로컬 규칙 매칭과 합산 (중복 제거)
+      const merged = mergeAndDedupe(matchBenefits(), apiItems);
       saveBenefits(merged);
       renderBenefitsPage();
-      toast(`복지 데이터 ${data.items.length}건 조회 완료`, 'success', 3000);
+
+      const loaded = apiItems.length;
+      const total  = data.totalCount || loaded;
+      toast(`API ${loaded}건 로드 (전체 ${total}건)`, 'success', 3000);
+
+      if (statusEl) statusEl.textContent =
+        `API ${loaded}건 로드됨 · 전체 ${total}건 중${total > loaded ? ` (${total - loaded}건 더 있음)` : ' (전체 로드됨)'}`;
     } else {
-      const msg = data.error || data.message || '연결 실패';
-      if (statusEl) {
-        statusEl.textContent = `API 오류: ${msg}`;
-        if (data.attempted) statusEl.title = data.attempted; // 마우스 올리면 URL 표시
-      }
+      const msg = data.error || '연결 실패';
+      if (statusEl) statusEl.textContent = `오류: ${msg}`;
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
-      console.error('[welfare API] error:', msg, '\nattempted:', data.attempted);
+      console.error('[welfare API]', msg, data.attempted);
     }
   } catch (e) {
     if (statusEl) statusEl.textContent = `네트워크 오류: ${e.message}`;
     if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
-    console.error('[welfare API]', e);
   }
 }
 
@@ -488,16 +496,18 @@ async function searchBenefitsWithAI(query) {
 
     // ── 2단계: 복지 API 호출 (빈 결과 시 파라미터 축소 재시도) ────
     const p = APP.profile;
-    const items = await fetchWelfareWithFallback(extracted, p);
+    console.log('[AI검색] 추출된 파라미터:', extracted);
+    const items = await fetchWelfareWithFallback(extracted, p, query);
 
     if (items.length) {
       BenefitsSearch.results = items.map(apiItemToLocal);
       BenefitsSearch.status = 'done';
     } else {
-      BenefitsSearch.error = '해당 조건의 혜택을 찾지 못했습니다. 다른 표현으로 검색해보세요.';
+      BenefitsSearch.error = `"${query}" 검색 결과가 없습니다. 콘솔(F12)에서 API 응답을 확인해보세요.`;
       BenefitsSearch.status = 'error';
     }
   } catch (e) {
+    console.error('[AI검색] 오류:', e);
     BenefitsSearch.error = e.message;
     BenefitsSearch.status = 'error';
   }
@@ -506,38 +516,54 @@ async function searchBenefitsWithAI(query) {
 }
 
 // ── 단계적 fallback API 호출 ──────────────────────────────────────
-// 파라미터가 많을수록 결과가 없을 수 있으므로 점진적으로 줄여서 재시도
-async function fetchWelfareWithFallback(extracted, profile) {
-  const base = new URLSearchParams({ type: 'central', rows: '20' });
-  if (profile?.age) base.set('age', String(parseInt(profile.age)));
+async function fetchWelfareWithFallback(extracted, profile, originalQuery) {
+  const kw   = (extracted.keyword || '').trim();
+  const life = (extracted.lifeArray || '').trim();
+  const trg  = (extracted.trgterIndvdlArray || '').trim();
+  const thm  = (extracted.intrsThemaArray || '').trim();
 
-  // 시도할 파라미터 조합 (좁은 → 넓은 순서)
+  // base: 공통 파라미터 (age는 profile에서)
+  const makeBase = () => {
+    const p = new URLSearchParams({ type: 'central', rows: '20' });
+    if (profile?.age) p.set('age', String(parseInt(profile.age)));
+    return p;
+  };
+
+  // 시도 순서: 좁은 → 넓은. 각각 유효한 파라미터 있을 때만 추가
   const attempts = [
-    // 1차: 전체 파라미터
-    { keyword: extracted.keyword, lifeArray: extracted.lifeArray,
-      trgterIndvdlArray: extracted.trgterIndvdlArray, intrsThemaArray: extracted.intrsThemaArray },
-    // 2차: 관심주제 제외
-    { keyword: extracted.keyword, lifeArray: extracted.lifeArray,
-      trgterIndvdlArray: extracted.trgterIndvdlArray },
-    // 3차: 키워드 + 생애주기만
-    { keyword: extracted.keyword, lifeArray: extracted.lifeArray },
-    // 4차: 키워드만
-    { keyword: extracted.keyword },
-    // 5차: 생애주기만 (키워드 없을 때 대비)
-    { lifeArray: extracted.lifeArray },
-  ].filter(a => Object.values(a).some(v => v)); // 빈 시도 제거
+    // 1차: 추출된 파라미터 전체
+    kw || life ? { keyword: kw, lifeArray: life, trgterIndvdlArray: trg, intrsThemaArray: thm } : null,
+    // 2차: 키워드 + 생애주기
+    (kw && life) ? { keyword: kw, lifeArray: life } : null,
+    // 3차: 키워드만
+    kw ? { keyword: kw } : null,
+    // 4차: 생애주기만
+    life ? { lifeArray: life } : null,
+    // 5차: 원본 쿼리를 키워드로 (항상 실행)
+    originalQuery ? { keyword: originalQuery } : null,
+  ].filter(Boolean);
 
-  for (const attempt of attempts) {
-    const params = new URLSearchParams(base);
+  console.log('[AI검색] 시도할 attempt 수:', attempts.length, attempts);
+
+  for (let i = 0; i < attempts.length; i++) {
+    const attempt = attempts[i];
+    const params = makeBase();
     if (attempt.keyword)           params.set('keyword', attempt.keyword);
     if (attempt.lifeArray)         params.set('lifeArray', attempt.lifeArray);
     if (attempt.trgterIndvdlArray) params.set('trgterIndvdlArray', attempt.trgterIndvdlArray);
     if (attempt.intrsThemaArray)   params.set('intrsThemaArray', attempt.intrsThemaArray);
 
-    const res = await fetch(`/api/welfare?${params}`);
+    const url = `/api/welfare?${params}`;
+    console.log(`[AI검색] ${i+1}차 시도:`, url);
+
+    const res  = await fetch(url);
     const data = await res.json();
-    if (data.success && data.items?.length) return data.items;
-    if (!data.success && data.error) throw new Error(data.error); // 진짜 오류는 즉시 중단
+    console.log(`[AI검색] ${i+1}차 응답:`, data.success, 'items:', data.items?.length, data.error || '');
+
+    if (data.success && data.items?.length > 0) return data.items;
+    if (!data.success && data.error && !data.error.includes('NO DATA')) {
+      throw new Error(data.error); // 진짜 오류(키 오류 등)만 중단
+    }
   }
   return [];
 }
@@ -756,22 +782,19 @@ async function runWelfareAPICheck() {
   _refreshAPICheckCard();
 
   const p = APP.profile;
-  const params = new URLSearchParams({ type: 'central', rows: '5' });
-  params.set('lifeArray', ageToLifeCode(parseInt(p?.age || 30), p?.pregnant));
-  if (p?.age) params.set('age', String(parseInt(p.age)));
-  const trgCode = p ? profileToTrgCode(p) : '';
-  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+  // 실제 복지 조회와 동일한 파라미터 사용 (rows=100)
+  const params = buildProfileParams(p, '100');
 
   try {
     const res = await fetch(`/api/welfare?${params}`);
     const data = await res.json();
 
-    if (data.success && data.items?.length) {
-      WelfareAPITest.status = 'ok';
+    if (data.success) {
+      WelfareAPITest.status = data.items?.length ? 'ok' : 'empty';
       WelfareAPITest.result = {
-        totalCount: data.totalCount,
-        count: data.count,
-        firstItem: data.items[0],
+        totalCount: data.totalCount || 0,
+        count: data.items?.length || 0,
+        firstItem: data.items?.[0] || null,
       };
     } else {
       WelfareAPITest.status = 'error';
@@ -813,9 +836,10 @@ function renderSidebarAPIWidget() {
   const label = {
     idle:    '미실행',
     loading: '점검 중...',
-    ok:      `연결됨 · ${result?.totalCount ?? 0}건`,
+    ok:      `연결됨 · ${result?.count ?? 0}건 로드 / 전체 ${result?.totalCount ?? 0}건`,
+    empty:   `연결됨 · 결과 없음 (전체 ${result?.totalCount ?? 0}건)`,
     error:   '오류',
-  }[status];
+  }[status] || status;
 
   let detail = '';
   if (status === 'ok' && result?.firstItem) {

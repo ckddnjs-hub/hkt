@@ -293,26 +293,28 @@ async function autoFetchWelfareOnProfileSave() {
   if (statusEl) statusEl.textContent = '실제 복지 데이터를 조회하는 중...';
   if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
 
-  const params = new URLSearchParams({
-    type: 'central',
-    rows: '30',
-    lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
-  });
-  if (p.age) params.set('age', String(parseInt(p.age)));
-  const trgCode = profileToTrgCode(p);
-  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+  // benefits.js의 buildProfileParams와 동일한 파라미터 (rows=100)
+  const params = typeof buildProfileParams === 'function'
+    ? buildProfileParams(p, '100')
+    : (() => {
+        const q = new URLSearchParams({ type: 'central', rows: '100' });
+        if (p.age) { q.set('lifeArray', ageToLifeCode(parseInt(p.age), p.pregnant)); q.set('age', String(parseInt(p.age))); }
+        const trg = profileToTrgCode(p); if (trg) q.set('trgterIndvdlArray', trg);
+        return q;
+      })();
 
   try {
     const res = await fetch(`/api/welfare?${params}`);
     const data = await res.json();
 
-    if (data.success && data.items?.length) {
-      const apiMatched = data.items.map(apiItemToLocal);
-      const merged = mergeAndDedupe(APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits(), apiMatched);
+    if (data.success) {
+      const apiItems = (data.items || []).map(apiItemToLocal);
+      const merged = mergeAndDedupe(matchBenefits(), apiItems);
       saveBenefits(merged);
       renderBenefitsPage();
       const name = p.name ? `${p.name}님 — ` : '';
-      toast(`${name}복지 혜택 ${merged.length}개 조회 완료`, 'success', 3000);
+      const total = data.totalCount || apiItems.length;
+      toast(`${name}${apiItems.length}건 로드 완료 (전체 ${total}건)`, 'success', 3000);
     } else {
       if (statusEl) statusEl.textContent = `API 미연결 — 로컬 데이터 ${APP.matchedBenefits.length}개 표시 중`;
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
