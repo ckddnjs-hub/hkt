@@ -1,271 +1,465 @@
 'use strict';
 
+// ── 위저드 상태 ──────────────────────────────────────────────────────
+const ProfileWizard = {
+  step: 0,
+  answers: {},  // { age, region, name, householdType, incomePercent, housing, employment, special:{...} }
+  _init: false,
+};
+
+// ── 단계 정의 ────────────────────────────────────────────────────────
+function getWizardSteps() {
+  return [
+    {
+      id: 'age',
+      q: '나이가 어떻게 되세요?',
+      hint: '받을 수 있는 혜택 판정에 꼭 필요합니다',
+      type: 'number',
+      required: true,
+      placeholder: '예: 35',
+      unit: '세',
+    },
+    {
+      id: 'region',
+      q: '어디에 사시나요?',
+      hint: '지역별로 추가 혜택이 다릅니다',
+      type: 'region',
+      required: true,
+    },
+    {
+      id: 'name',
+      q: '이름을 알려주시겠어요?',
+      hint: '안내 메시지에 이름으로 불러드릴게요',
+      type: 'text',
+      required: false,
+      placeholder: '예: 홍길동',
+    },
+    {
+      id: 'householdType',
+      q: '가구 형태가 어떻게 되나요?',
+      type: 'choice',
+      required: false,
+      options: [
+        { value: 'single',        label: '혼자 살아요' },
+        { value: 'couple',        label: '부부만 살아요' },
+        { value: 'nuclear',       label: '부부 + 자녀' },
+        { value: 'single-parent', label: '한부모 가구' },
+        { value: 'multi-gen',     label: '3세대 이상' },
+      ],
+    },
+    {
+      id: 'incomePercent',
+      q: '소득 수준을 알려주시겠어요?',
+      hint: '이 기기에만 저장되며 외부로 전송되지 않습니다\n소득 기반 혜택(기초생활·주거급여 등)을 더 정확히 찾을 수 있어요',
+      type: 'choice',
+      required: false,
+      subLabel: '기준 중위소득 대비',
+      options: [
+        { value: '30',  label: '30% 이하',  sub: '기초생계급여 대상' },
+        { value: '50',  label: '50% 이하',  sub: '교육급여 대상' },
+        { value: '75',  label: '75% 수준',  sub: '저소득' },
+        { value: '100', label: '100% 수준', sub: '중위소득' },
+        { value: '120', label: '120% 이상', sub: '' },
+      ],
+    },
+    {
+      id: 'housing',
+      q: '지금 어떻게 살고 계세요?',
+      type: 'choice',
+      required: false,
+      options: [
+        { value: 'own',    label: '내 집이에요' },
+        { value: 'jeonse', label: '전세예요' },
+        { value: 'rent',   label: '월세예요' },
+        { value: 'public', label: '공공임대예요' },
+        { value: 'family', label: '가족 집에 살아요' },
+      ],
+    },
+    {
+      id: 'employment',
+      q: '현재 일을 하고 계신가요?',
+      type: 'choice',
+      required: false,
+      options: [
+        { value: 'employed',      label: '직장에 다녀요' },
+        { value: 'self-employed', label: '자영업이에요' },
+        { value: 'unemployed',    label: '일이 없어요' },
+        { value: 'retired',       label: '은퇴했어요' },
+      ],
+    },
+    {
+      id: 'special',
+      q: '해당되는 상황이 있으신가요?',
+      hint: '복수 선택 가능 · 없으면 건너뛰세요',
+      type: 'checkbox',
+      required: false,
+      options: [
+        { key: 'disability',  label: '장애 등록이 있어요' },
+        { key: 'pregnant',    label: '임신 중이에요' },
+        { key: 'elderly',     label: '65세 이상 어르신을 부양해요' },
+        { key: 'hasChildren', label: '자녀가 있어요' },
+        { key: 'veteran',     label: '국가유공자예요' },
+      ],
+    },
+  ];
+}
+
 // ── 프로필 페이지 렌더링 ─────────────────────────────────────────────
 function renderProfilePage() {
   const page = document.getElementById('page-profile');
   if (!page) return;
-  const p = APP.profile || {};
 
-  page.innerHTML = `
-    <div class="page-title">내 정보</div>
-    <div class="page-sub">나이와 지역만 입력해도 바로 조회됩니다</div>
+  // 처음 진입 시 기존 프로필로 초기값 설정
+  if (!ProfileWizard._init) {
+    const p = APP.profile || {};
+    ProfileWizard.answers = {
+      age:           p.age        || '',
+      region:        p.region     || '',
+      name:          p.name       || '',
+      householdType: p.householdType || '',
+      incomePercent: p.incomePercent || '',
+      housing:       p.housing    || '',
+      employment:    p.employment || '',
+      special: {
+        disability:  !!p.disability,
+        pregnant:    !!p.pregnant,
+        elderly:     !!p.elderly,
+        hasChildren: !!p.hasChildren,
+        veteran:     !!p.veteran,
+      },
+    };
+    ProfileWizard.step = 0;
+    ProfileWizard._init = true;
+  }
 
-    <!-- ── 필수: 나이 + 지역 ── -->
-    <div class="profile-section" style="border:2px solid var(--primary);border-radius:var(--radius)">
-      <div class="profile-section-title" style="color:var(--primary)">기본 정보 <span style="font-size:.72rem;font-weight:400;color:var(--text-muted)">— 이것만 입력해도 조회됩니다</span></div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">나이 <span style="color:var(--primary);font-size:.7rem">필수</span></label>
-          <input class="form-input" id="pf-age" type="number" min="1" max="100" placeholder="30" value="${esc(p.age || '')}">
-        </div>
-        <div class="form-group">
-          <label class="form-label">거주 지역 <span style="color:var(--primary);font-size:.7rem">필수</span></label>
-          <select class="form-select" id="pf-region">
-            <option value="">선택</option>
-            ${REGIONS.map(r => `<option value="${r}" ${p.region === r ? 'selected' : ''}>${r}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-      <div class="form-group">
-        <label class="form-label">이름 <span style="font-size:.7rem;color:var(--text-dim)">(선택 — 개인화 안내에 사용)</span></label>
-        <input class="form-input" id="pf-name" type="text" placeholder="홍길동" value="${esc(p.name || '')}">
-      </div>
-    </div>
-
-    <!-- ── 선택: 상세 정보 ── -->
-    <div style="margin:16px 0 8px;display:flex;align-items:center;gap:8px">
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-      <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">선택 — 입력할수록 정확한 매칭</span>
-      <div style="flex:1;height:1px;background:var(--border)"></div>
-    </div>
-
-    <!-- 가구 -->
-    <div class="profile-section">
-      <div class="profile-section-title">가구 상황 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택)</span></div>
-      <div class="form-group">
-        <label class="form-label">가구 유형</label>
-        <select class="form-select" id="pf-household-type">
-          <option value="">선택 안 함</option>
-          ${[
-            ['single', '1인 가구'],
-            ['couple', '부부 가구'],
-            ['nuclear', '핵가족 (부부+자녀)'],
-            ['single-parent', '한부모 가구'],
-            ['multi-gen', '3세대 이상'],
-          ].map(([val, label]) => `<option value="${val}" ${p.householdType === val ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">가구원 수</label>
-          <select class="form-select" id="pf-household-size">
-            <option value="">선택 안 함</option>
-            ${[1,2,3,4,5,6].map(n => `<option value="${n}" ${p.householdSize == n ? 'selected' : ''}>${n}명${n===6?'+':''}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">자녀 유무</label>
-          <div class="toggle-group">
-            <button class="toggle-btn ${p.hasChildren ? 'active' : ''}" id="pf-children-yes">있음</button>
-            <button class="toggle-btn ${!p.hasChildren ? 'active' : ''}" id="pf-children-no">없음</button>
-          </div>
-        </div>
-      </div>
-      <div id="pf-children-section" style="${p.hasChildren ? '' : 'display:none'}">
-        <div class="form-group">
-          <label class="form-label">막내 자녀 나이</label>
-          <input class="form-input" id="pf-child-age" type="number" min="0" max="20" placeholder="만 나이" value="${esc(p.childAge || '')}">
-        </div>
-      </div>
-    </div>
-
-    <!-- 소득 (민감정보) -->
-    <div class="profile-section">
-      <div class="profile-section-title">소득 수준 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택)</span></div>
-      <div style="font-size:.76rem;color:var(--text-muted);margin-bottom:10px;padding:8px 10px;background:var(--bg3);border-radius:8px;line-height:1.6">
-        소득 정보는 이 기기에만 저장되며 외부로 전송되지 않습니다.<br>
-        입력하면 기초생활·주거급여 등 소득 기반 혜택을 더 정확히 찾을 수 있습니다.
-      </div>
-      <div class="form-group">
-        <label class="form-label">기준 중위소득 대비</label>
-        <select class="form-select" id="pf-income">
-          <option value="">입력 안 함</option>
-          ${[
-            ['30', '30% 이하 — 기초생계급여 대상'],
-            ['40', '40% 이하 — 기초의료급여 대상'],
-            ['48', '48% 이하 — 주거급여 대상'],
-            ['50', '50% 이하 — 교육급여 대상'],
-            ['60', '60% 수준 — 저소득'],
-            ['75', '75% 수준'],
-            ['100', '100% 수준 — 중위소득'],
-            ['120', '120% 이상'],
-          ].map(([val, label]) => `<option value="${val}" ${p.incomePercent === val ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">취업 상태</label>
-          <div class="toggle-group" id="pf-employment-group">
-            ${[
-              ['employed', '재직'],
-              ['self-employed', '자영업'],
-              ['unemployed', '미취업'],
-              ['retired', '은퇴'],
-            ].map(([val, label]) => `<button class="toggle-btn ${p.employment === val ? 'active' : ''}" data-employment="${val}">${label}</button>`).join('')}
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="form-label">주거 형태</label>
-          <div class="toggle-group" id="pf-housing-group">
-            ${[
-              ['own', '자가'],
-              ['jeonse', '전세'],
-              ['rent', '월세'],
-              ['public', '공공임대'],
-            ].map(([val, label]) => `<button class="toggle-btn ${p.housing === val ? 'active' : ''}" data-housing="${val}">${label}</button>`).join('')}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 특수 상황 -->
-    <div class="profile-section">
-      <div class="profile-section-title">특수 상황 <span style="font-size:.7rem;font-weight:400;color:var(--text-dim)">(선택 — 해당하는 항목만)</span></div>
-      <div class="checkbox-group" id="pf-special-group">
-        ${[
-          ['disability', '장애 등록', '♿'],
-          ['pregnant', '임신 중', '🤰'],
-          ['elderly', '65세+ 부양', '👴'],
-          ['veteran', '국가유공자', '🎖'],
-          ['lowCredit', '신용불량', ''],
-          ['foreignMarriage', '결혼이민자', ''],
-        ].map(([key, label, icon]) => `
-          <label class="checkbox-item ${p[key] ? 'checked' : ''}" data-key="${key}">
-            <span>${icon ? icon + ' ' : ''}${label}</span>
-            <span class="checkbox-check">${p[key] ? '✓' : ''}</span>
-          </label>`).join('')}
-      </div>
-    </div>
-
-    <!-- 저장 버튼 -->
-    <button class="btn btn-primary btn-full btn-lg mt20" id="btn-save-profile">
-      저장하고 혜택 조회하기
-    </button>
-  `;
-
-  initProfileEvents();
-  updateProfileCompletion();
+  page.innerHTML = `<div id="wizard-root" style="min-height:100%"></div>`;
+  renderWizardStep();
 }
 
-// ── 프로필 이벤트 초기화 ─────────────────────────────────────────────
-function initProfileEvents() {
-  // 성별 토글
-  document.querySelectorAll('[data-gender]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-gender]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
+// ── 현재 단계 렌더 ───────────────────────────────────────────────────
+function renderWizardStep() {
+  const root = document.getElementById('wizard-root');
+  if (!root) return;
 
-  // 고용 토글
-  document.querySelectorAll('[data-employment]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-employment]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
+  const steps = getWizardSteps();
+  const step  = ProfileWizard.step;
 
-  // 주거 토글
-  document.querySelectorAll('[data-housing]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-housing]').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    });
-  });
-
-  // 자녀 토글
-  document.getElementById('pf-children-yes')?.addEventListener('click', () => {
-    document.getElementById('pf-children-yes').classList.add('active');
-    document.getElementById('pf-children-no').classList.remove('active');
-    document.getElementById('pf-children-section').style.display = '';
-  });
-  document.getElementById('pf-children-no')?.addEventListener('click', () => {
-    document.getElementById('pf-children-no').classList.add('active');
-    document.getElementById('pf-children-yes').classList.remove('active');
-    document.getElementById('pf-children-section').style.display = 'none';
-  });
-
-  // 체크박스
-  document.querySelectorAll('[data-key]').forEach(item => {
-    item.addEventListener('click', () => {
-      item.classList.toggle('checked');
-      const check = item.querySelector('.checkbox-check');
-      if (check) check.textContent = item.classList.contains('checked') ? '✓' : '';
-    });
-  });
-
-  // 입력 변경 시 완성도 업데이트
-  document.querySelectorAll('#page-profile .form-input, #page-profile .form-select').forEach(el => {
-    el.addEventListener('input', updateProfileCompletion);
-  });
-
-  // 저장 + 자동 조회
-  document.getElementById('btn-save-profile')?.addEventListener('click', saveProfileFromForm);
-}
-
-// ── 프로필 완성도 계산 (필수 2 + 선택 6) ────────────────────────────
-function updateProfileCompletion() {
-  const required = ['pf-age', 'pf-region'];
-  const optional = ['pf-name', 'pf-household-type', 'pf-income', 'pf-household-size'];
-  const reqFilled = required.filter(id => document.getElementById(id)?.value.trim()).length;
-  const optFilled = optional.filter(id => document.getElementById(id)?.value.trim()).length;
-
-  const pct = Math.round(((reqFilled * 2 + optFilled) / (required.length * 2 + optional.length)) * 100);
-  const pctEl = document.getElementById('profile-pct');
-  if (pctEl) pctEl.textContent = `${pct}%`;
-
-  const bar = document.querySelector('#profile-complete-bar .progress-bar-fill');
-  if (bar) bar.style.width = `${pct}%`;
-}
-
-// ── 폼에서 프로필 읽기 ───────────────────────────────────────────────
-function readProfileFromForm() {
-  const specialKeys = ['disability', 'pregnant', 'elderly', 'veteran', 'lowCredit', 'foreignMarriage'];
-  const specialValues = {};
-  specialKeys.forEach(key => {
-    specialValues[key] = document.querySelector(`[data-key="${key}"]`)?.classList.contains('checked') || false;
-  });
-
-  return {
-    name: document.getElementById('pf-name')?.value.trim() || '',
-    age: document.getElementById('pf-age')?.value || '',
-    gender: document.querySelector('[data-gender].active')?.dataset.gender || '',
-    region: document.getElementById('pf-region')?.value || '',
-    householdType: document.getElementById('pf-household-type')?.value || '',
-    householdSize: document.getElementById('pf-household-size')?.value || '',
-    hasChildren: document.getElementById('pf-children-yes')?.classList.contains('active') || false,
-    childAge: document.getElementById('pf-child-age')?.value || '',
-    incomePercent: document.getElementById('pf-income')?.value || '',
-    employment: document.querySelector('[data-employment].active')?.dataset.employment || '',
-    housing: document.querySelector('[data-housing].active')?.dataset.housing || '',
-    ...specialValues,
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-// ── 프로필 저장 + 자동 복지 조회 ───────────────────────────────────
-async function saveProfileFromForm() {
-  const profile = readProfileFromForm();
-
-  if (!profile.age) {
-    toast('나이는 필수입니다', 'warn');
-    document.getElementById('pf-age')?.focus();
+  // 완료 화면
+  if (step >= steps.length) {
+    root.innerHTML = renderWizardDone();
     return;
   }
 
-  saveProfile(profile);
+  const s       = steps[step];
+  const total   = steps.length;
+  const pct     = Math.round((step / total) * 100);
+  const ans     = ProfileWizard.answers;
+  const prevAns = buildAnswerSummary(step, steps, ans);
 
-  // 로컬 규칙 매칭 먼저
+  root.innerHTML = `
+    <!-- 상단 진행 바 -->
+    <div style="position:sticky;top:0;z-index:10;background:var(--bg1);padding:14px 0 10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        ${step > 0 ? `
+          <button onclick="wizardBack()"
+            style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:.8rem;cursor:pointer;font-family:inherit">
+            ← 이전
+          </button>` : '<div style="width:54px"></div>'}
+        <div style="flex:1;height:4px;background:var(--bg3);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--primary);border-radius:4px;transition:width .3s ease"></div>
+        </div>
+        <span style="font-size:.75rem;color:var(--text-muted);white-space:nowrap">${step + 1} / ${total}</span>
+      </div>
+    </div>
+
+    <!-- 이전 답변 요약 -->
+    ${prevAns ? `
+      <div style="font-size:.76rem;color:var(--text-dim);margin-bottom:16px;line-height:1.8">
+        ${prevAns}
+      </div>` : ''}
+
+    <!-- 질문 -->
+    <div style="font-size:1.4rem;font-weight:900;letter-spacing:-.03em;line-height:1.45;margin-bottom:${s.hint ? '8px' : '24px'}">
+      ${esc(s.q)}
+    </div>
+    ${s.hint ? `
+      <div style="font-size:.8rem;color:var(--text-muted);margin-bottom:20px;line-height:1.7;white-space:pre-wrap">${esc(s.hint)}</div>` : ''}
+    ${s.subLabel ? `<div style="font-size:.75rem;color:var(--text-dim);margin-bottom:10px">${esc(s.subLabel)}</div>` : ''}
+
+    <!-- 입력 영역 -->
+    <div id="wizard-input">
+      ${renderWizardInput(s)}
+    </div>
+
+    <!-- 하단 버튼 -->
+    <div style="margin-top:24px;display:flex;flex-direction:column;gap:8px">
+      ${s.type === 'number' || s.type === 'text' ? `
+        <button onclick="wizardNext()"
+          class="btn btn-primary btn-full"
+          style="padding:14px;font-size:1rem">
+          다음 →
+        </button>` : ''}
+      ${s.type === 'checkbox' ? `
+        <button onclick="wizardNext()"
+          class="btn btn-primary btn-full"
+          style="padding:14px;font-size:1rem">
+          다음 →
+        </button>` : ''}
+      ${!s.required ? `
+        <button onclick="wizardSkip()"
+          style="padding:10px;border-radius:10px;border:none;background:transparent;color:var(--text-dim);font-size:.84rem;cursor:pointer;font-family:inherit">
+          건너뛰기
+        </button>` : ''}
+    </div>
+  `;
+
+  // number/text 인풋 자동 포커스
+  if (s.type === 'number' || s.type === 'text') {
+    setTimeout(() => document.getElementById('wizard-field')?.focus(), 80);
+  }
+}
+
+// ── 단계별 입력 렌더 ─────────────────────────────────────────────────
+function renderWizardInput(s) {
+  const ans = ProfileWizard.answers;
+
+  if (s.type === 'number') {
+    return `
+      <div style="display:flex;align-items:center;gap:10px">
+        <input
+          id="wizard-field"
+          type="number" min="1" max="110"
+          value="${esc(ans[s.id] || '')}"
+          placeholder="${esc(s.placeholder || '')}"
+          onkeydown="if(event.key==='Enter')wizardNext()"
+          style="width:120px;padding:14px 16px;font-size:1.8rem;font-weight:700;text-align:center;
+                 border-radius:12px;border:2px solid var(--primary);background:var(--bg2);
+                 color:var(--text);font-family:inherit;outline:none"
+        >
+        <span style="font-size:1.2rem;color:var(--text-muted)">${esc(s.unit || '')}</span>
+      </div>`;
+  }
+
+  if (s.type === 'text') {
+    return `
+      <input
+        id="wizard-field"
+        type="text"
+        value="${esc(ans[s.id] || '')}"
+        placeholder="${esc(s.placeholder || '')}"
+        onkeydown="if(event.key==='Enter')wizardNext()"
+        style="width:100%;max-width:280px;padding:14px 16px;font-size:1.2rem;font-weight:600;
+               border-radius:12px;border:2px solid var(--primary);background:var(--bg2);
+               color:var(--text);font-family:inherit;outline:none"
+      >`;
+  }
+
+  if (s.type === 'region') {
+    return `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        ${REGIONS.map(r => `
+          <button onclick="wizardSelectRegion('${r}')"
+            style="padding:12px 8px;border-radius:10px;
+                   border:2px solid ${ans.region === r ? 'var(--primary)' : 'var(--border)'};
+                   background:${ans.region === r ? 'rgba(59,130,246,.12)' : 'var(--bg2)'};
+                   color:${ans.region === r ? 'var(--primary)' : 'var(--text)'};
+                   font-size:.88rem;font-weight:${ans.region === r ? '700' : '400'};
+                   cursor:pointer;font-family:inherit;transition:all .15s">
+            ${esc(r)}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  if (s.type === 'choice') {
+    return `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${s.options.map(opt => `
+          <button onclick="wizardSelectChoice('${s.id}','${opt.value}')"
+            style="padding:14px 18px;border-radius:12px;text-align:left;
+                   border:2px solid ${ans[s.id] === opt.value ? 'var(--primary)' : 'var(--border)'};
+                   background:${ans[s.id] === opt.value ? 'rgba(59,130,246,.1)' : 'var(--bg2)'};
+                   color:${ans[s.id] === opt.value ? 'var(--primary)' : 'var(--text)'};
+                   cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:space-between">
+            <span style="font-size:.95rem;font-weight:${ans[s.id] === opt.value ? '700' : '500'}">${esc(opt.label)}</span>
+            ${opt.sub ? `<span style="font-size:.74rem;color:var(--text-dim)">${esc(opt.sub)}</span>` : ''}
+            ${ans[s.id] === opt.value ? `<span style="color:var(--primary);font-size:1rem;margin-left:8px">✓</span>` : ''}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  if (s.type === 'checkbox') {
+    const sp = ans.special || {};
+    return `
+      <div style="display:flex;flex-direction:column;gap:8px">
+        ${s.options.map(opt => `
+          <button onclick="wizardToggleCheckbox('${opt.key}')"
+            style="padding:14px 18px;border-radius:12px;text-align:left;
+                   border:2px solid ${sp[opt.key] ? 'var(--primary)' : 'var(--border)'};
+                   background:${sp[opt.key] ? 'rgba(59,130,246,.1)' : 'var(--bg2)'};
+                   color:${sp[opt.key] ? 'var(--primary)' : 'var(--text)'};
+                   cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:12px">
+            <span style="width:20px;height:20px;border-radius:6px;border:2px solid ${sp[opt.key] ? 'var(--primary)' : 'var(--border)'};
+                         background:${sp[opt.key] ? 'var(--primary)' : 'transparent'};
+                         display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.7rem;color:#fff">
+              ${sp[opt.key] ? '✓' : ''}
+            </span>
+            <span style="font-size:.93rem;font-weight:${sp[opt.key] ? '700' : '400'}">${esc(opt.label)}</span>
+          </button>`).join('')}
+      </div>`;
+  }
+
+  return '';
+}
+
+// ── 완료 화면 ────────────────────────────────────────────────────────
+function renderWizardDone() {
+  const ans = ProfileWizard.answers;
+  const sp  = ans.special || {};
+  const rows = [
+    ['나이',     ans.age ? ans.age + '세' : ''],
+    ['지역',     ans.region],
+    ['이름',     ans.name],
+    ['가구',     { single:'1인', couple:'부부', nuclear:'부부+자녀', 'single-parent':'한부모', 'multi-gen':'3세대+' }[ans.householdType] || ''],
+    ['소득',     ans.incomePercent ? '중위소득 ' + ans.incomePercent + '%' : ''],
+    ['주거',     { own:'자가', jeonse:'전세', rent:'월세', public:'공공임대', family:'가족동거' }[ans.housing] || ''],
+    ['취업',     { employed:'재직', 'self-employed':'자영업', unemployed:'미취업', retired:'은퇴' }[ans.employment] || ''],
+    ['특수상황', Object.entries(sp).filter(([,v])=>v).map(([k])=>({disability:'장애',pregnant:'임신',elderly:'노인부양',hasChildren:'자녀있음',veteran:'국가유공자'}[k]||k)).join(', ')],
+  ].filter(([,v]) => v);
+
+  return `
+    <div style="text-align:center;padding:20px 0 16px">
+      <div style="font-size:1.5rem;font-weight:900;margin-bottom:6px">입력 완료</div>
+      <div style="font-size:.84rem;color:var(--text-muted)">아래 내용으로 복지 혜택을 조회합니다</div>
+    </div>
+
+    <div style="background:var(--bg2);border-radius:14px;padding:16px;margin-bottom:20px">
+      ${rows.map(([label, value]) => `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:.82rem;color:var(--text-muted)">${label}</span>
+          <span style="font-size:.84rem;font-weight:600">${esc(value)}</span>
+        </div>`).join('')}
+    </div>
+
+    <button onclick="wizardSave()" class="btn btn-primary btn-full" style="padding:16px;font-size:1rem;font-weight:700">
+      저장하고 혜택 조회하기
+    </button>
+    <button onclick="ProfileWizard.step=0;renderWizardStep()"
+      style="width:100%;margin-top:10px;padding:10px;border:none;background:transparent;color:var(--text-dim);font-size:.84rem;cursor:pointer;font-family:inherit">
+      처음부터 다시 입력하기
+    </button>
+  `;
+}
+
+// ── 이전 답변 요약 텍스트 생성 ──────────────────────────────────────
+function buildAnswerSummary(currentStep, steps, ans) {
+  const lines = [];
+  for (let i = 0; i < currentStep && i < steps.length; i++) {
+    const s = steps[i];
+    let val = '';
+    if (s.type === 'number')   val = ans[s.id] ? ans[s.id] + (s.unit || '') : '';
+    if (s.type === 'text')     val = ans[s.id] || '';
+    if (s.type === 'region')   val = ans.region || '';
+    if (s.type === 'choice')   val = s.options.find(o => o.value === ans[s.id])?.label || '';
+    if (s.type === 'checkbox') {
+      const sp = ans.special || {};
+      val = s.options.filter(o => sp[o.key]).map(o => o.label).join(', ');
+    }
+    if (val) lines.push(`<span style="color:var(--text)">${esc(val)}</span>`);
+  }
+  return lines.length ? lines.join(' · ') : '';
+}
+
+// ── 위저드 액션 ──────────────────────────────────────────────────────
+function wizardNext() {
+  const steps = getWizardSteps();
+  const s     = steps[ProfileWizard.step];
+  if (!s) return;
+
+  // 값 읽기
+  if (s.type === 'number' || s.type === 'text') {
+    const val = document.getElementById('wizard-field')?.value.trim() || '';
+    if (s.required && !val) {
+      toast('필수 항목입니다', 'warn');
+      document.getElementById('wizard-field')?.focus();
+      return;
+    }
+    ProfileWizard.answers[s.id] = val;
+  }
+
+  if (s.type === 'region' && s.required && !ProfileWizard.answers.region) {
+    toast('지역을 선택해주세요', 'warn');
+    return;
+  }
+
+  ProfileWizard.step++;
+  renderWizardStep();
+  document.getElementById('wizard-root')?.scrollTo(0, 0);
+  document.querySelector('.app-body')?.scrollTo(0, 0);
+}
+
+function wizardBack() {
+  if (ProfileWizard.step > 0) {
+    ProfileWizard.step--;
+    renderWizardStep();
+  }
+}
+
+function wizardSkip() {
+  ProfileWizard.step++;
+  renderWizardStep();
+  document.querySelector('.app-body')?.scrollTo(0, 0);
+}
+
+function wizardSelectRegion(region) {
+  ProfileWizard.answers.region = region;
+  // 자동 다음 단계
+  setTimeout(() => { ProfileWizard.step++; renderWizardStep(); }, 250);
+}
+
+function wizardSelectChoice(field, value) {
+  ProfileWizard.answers[field] = value;
+  // 선택 표시 후 자동 다음 단계
+  renderWizardStep(); // 선택 상태 즉시 반영
+  setTimeout(() => { ProfileWizard.step++; renderWizardStep(); }, 350);
+}
+
+function wizardToggleCheckbox(key) {
+  if (!ProfileWizard.answers.special) ProfileWizard.answers.special = {};
+  ProfileWizard.answers.special[key] = !ProfileWizard.answers.special[key];
+  renderWizardStep(); // 즉시 UI 반영
+}
+
+// ── 위저드 저장 ──────────────────────────────────────────────────────
+function wizardSave() {
+  const ans = ProfileWizard.answers;
+  const sp  = ans.special || {};
+
+  if (!ans.age) {
+    toast('나이를 입력해주세요', 'warn');
+    ProfileWizard.step = 0;
+    renderWizardStep();
+    return;
+  }
+
+  const profile = {
+    name:          (ans.name || '').trim(),
+    age:           ans.age,
+    region:        ans.region || '',
+    householdType: ans.householdType || '',
+    incomePercent: ans.incomePercent || '',
+    housing:       ans.housing || '',
+    employment:    ans.employment || '',
+    disability:    !!sp.disability,
+    pregnant:      !!sp.pregnant,
+    elderly:       !!sp.elderly,
+    hasChildren:   !!sp.hasChildren,
+    veteran:       !!sp.veteran,
+    updatedAt:     new Date().toISOString(),
+  };
+
+  saveProfile(profile);
+  ProfileWizard._init = false; // 다음 진입 시 재초기화
+
   const matched = matchBenefits();
   saveBenefits(matched);
   updateWelfareMiniScore();
@@ -274,11 +468,9 @@ async function saveProfileFromForm() {
   const name = profile.name ? `${profile.name}님, ` : '';
   toast(`${name}복지 데이터를 조회합니다...`, 'info', 2000);
 
-  // 혜택 페이지로 이동 후 실제 API 자동 조회
   navigateTo('benefits');
   setTimeout(() => autoFetchWelfareOnProfileSave(), 400);
 
-  // Supabase 동기화 (비동기)
   dbSaveProfile(profile).catch(() => {});
 }
 
@@ -287,40 +479,42 @@ async function autoFetchWelfareOnProfileSave() {
   const p = APP.profile;
   if (!p) return;
 
-  // benefits 페이지의 상태 표시 업데이트
   const statusEl = document.getElementById('api-fetch-status');
-  const btn = document.getElementById('btn-fetch-api');
-  if (statusEl) statusEl.textContent = '실제 복지 데이터를 조회하는 중...';
+  const btn      = document.getElementById('btn-fetch-api');
+  if (statusEl) statusEl.textContent = '복지 데이터를 조회하는 중...';
   if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
 
-  // benefits.js의 buildProfileParams와 동일한 파라미터 (rows=100)
   const params = typeof buildProfileParams === 'function'
     ? buildProfileParams(p, '100')
     : (() => {
         const q = new URLSearchParams({ type: 'central', rows: '100' });
-        if (p.age) { q.set('lifeArray', ageToLifeCode(parseInt(p.age), p.pregnant)); q.set('age', String(parseInt(p.age))); }
-        const trg = profileToTrgCode(p); if (trg) q.set('trgterIndvdlArray', trg);
+        if (p.age) {
+          q.set('lifeArray', ageToLifeCode(parseInt(p.age), p.pregnant));
+          q.set('age', String(parseInt(p.age)));
+        }
+        const trg = profileToTrgCode(p);
+        if (trg) q.set('trgterIndvdlArray', trg);
         return q;
       })();
 
   try {
-    const res = await fetch(`/api/welfare?${params}`);
+    const res  = await fetch(`/api/welfare?${params}`);
     const data = await res.json();
 
     if (data.success) {
       const apiItems = (data.items || []).map(apiItemToLocal);
-      const merged = mergeAndDedupe(matchBenefits(), apiItems);
+      const merged   = mergeAndDedupe(matchBenefits(), apiItems);
       saveBenefits(merged);
       renderBenefitsPage();
-      const name = p.name ? `${p.name}님 — ` : '';
+      const name  = p.name ? `${p.name}님 — ` : '';
       const total = data.totalCount || apiItems.length;
       toast(`${name}${apiItems.length}건 로드 완료 (전체 ${total}건)`, 'success', 3000);
     } else {
-      if (statusEl) statusEl.textContent = `API 미연결 — 로컬 데이터 ${APP.matchedBenefits.length}개 표시 중`;
+      if (statusEl) statusEl.textContent = `API 오류 — 로컬 데이터 표시 중`;
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
     }
   } catch (e) {
-    if (statusEl) statusEl.textContent = '조회 실패 — 로컬 데이터만 표시됩니다';
+    if (statusEl) statusEl.textContent = '조회 실패';
     if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
   }
 }
