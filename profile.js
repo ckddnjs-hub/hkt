@@ -298,6 +298,7 @@ async function autoFetchWelfareOnProfileSave() {
     rows: '30',
     lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
   });
+  if (p.age) params.set('age', String(parseInt(p.age)));
   const trgCode = profileToTrgCode(p);
   if (trgCode) params.set('trgterIndvdlArray', trgCode);
 

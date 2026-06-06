@@ -1,10 +1,10 @@
-const CACHE = 'bokjion-v1';
+const CACHE = 'bokjion-v3';
 const SHELL = [
   '/', '/index.html', '/app.css',
-  '/constants.js', '/core.js', '/ui.js',
+  '/constants.js', '/core.js', '/ui.js', '/db.js',
   '/profile.js', '/benefits.js', '/news.js',
-  '/lifecycle.js', '/agents.js', '/apply.js',
-  '/manifest.json'
+  '/lifecycle.js', '/apply.js', '/chat.js',
+  '/voice.js', '/admin.js', '/manifest.json'
 ];
 
 self.addEventListener('install', e => {
@@ -25,11 +25,15 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET') return;
   if (url.origin !== location.origin) return;
+  if (url.pathname.startsWith('/api/')) return; // serverless 함수는 캐시 안 함
 
   e.respondWith(
     caches.match(e.request).then(cached => {
       const fresh = fetch(e.request).then(res => {
-        if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+        if (res.ok) {
+          const toCache = res.clone(); // body 소비 전에 먼저 clone
+          caches.open(CACHE).then(c => c.put(e.request, toCache));
+        }
         return res;
       }).catch(() => cached);
       return cached || fresh;

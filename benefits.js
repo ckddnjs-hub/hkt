@@ -111,81 +111,138 @@ function filterBenefits(filter, btn) {
 
 // ── 혜택 상세 모달 ───────────────────────────────────────────────────
 function openBenefitDetail(benefitId) {
-  // 조회수 통계 기록 (비동기, 조용히)
   if (typeof dbTrackBenefitView === 'function') {
     dbTrackBenefitView(benefitId).catch(() => {});
   }
 
-  const benefit = WELFARE_DB.find(b => b.id === benefitId);
+  // API 항목은 matchedBenefits에, 로컬 항목은 WELFARE_DB에 있음
+  const benefit = APP.matchedBenefits.find(b => b.id === benefitId)
+               || WELFARE_DB.find(b => b.id === benefitId);
   if (!benefit) return;
 
   selectedBenefitId = benefitId;
-  const cat = BENEFIT_CATEGORIES[benefit.category] || { icon: '📋', color: '#64748B' };
   const modal = document.getElementById('benefit-detail-modal');
   const content = document.getElementById('benefit-detail-content');
-
   if (!modal || !content) return;
 
-  content.innerHTML = `
+  content.innerHTML = renderBenefitDetailBase(benefit);
+  openModal('benefit-modal-overlay');
+
+  // API 항목이면 상세 정보 추가 로딩
+  if (benefit.fromAPI && benefit.id.startsWith('WLF')) {
+    fetchAndRenderBenefitDetail(benefit.id);
+  }
+}
+
+// ── 기본 모달 내용 (목록 데이터 기반, 즉시 표시) ────────────────────
+function renderBenefitDetailBase(benefit) {
+  const cat = BENEFIT_CATEGORIES[benefit.category] || { icon: '📋', color: '#64748B' };
+  return `
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px">
       <div style="width:52px;height:52px;border-radius:16px;background:${cat.color}20;display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0">${cat.icon}</div>
       <div>
         <div style="font-size:1.1rem;font-weight:900">${esc(benefit.name)}</div>
-        <div style="font-size:.83rem;color:var(--text-muted)">${esc(benefit.agency)}</div>
+        <div style="font-size:.83rem;color:var(--text-muted)">${esc(benefit.agency || '')}</div>
       </div>
     </div>
 
-    <div class="benefit-detail-amount">${esc(benefit.amount)}</div>
-    <div class="benefit-detail-desc">${esc(benefit.description)}</div>
+    ${benefit.amount ? `<div class="benefit-detail-amount">${esc(benefit.amount)}</div>` : ''}
+    ${benefit.description ? `<div class="benefit-detail-desc">${esc(benefit.description)}</div>` : ''}
 
-    <div class="detail-section">
-      <div class="detail-section-title">신청 자격</div>
-      <div class="conditions-list">
-        ${benefit.ageRange ? `<div class="condition-item"><span class="condition-icon">✓</span> 나이: ${benefit.ageRange[0]}~${benefit.ageRange[1]}세</div>` : ''}
-        ${benefit.conditions?.maxIncome ? `<div class="condition-item"><span class="condition-icon">✓</span> 소득: 기준 중위소득 ${benefit.conditions.maxIncome}% 이하</div>` : ''}
-        ${benefit.conditions?.disability ? `<div class="condition-item"><span class="condition-icon">✓</span> 장애인 등록 필수</div>` : ''}
-        ${benefit.conditions?.pregnant ? `<div class="condition-item"><span class="condition-icon">✓</span> 임산부 대상</div>` : ''}
-        ${benefit.conditions?.hasChildren ? `<div class="condition-item"><span class="condition-icon">✓</span> 자녀 있는 가구</div>` : ''}
+    ${benefit.srvPvsnNm ? `
+      <div style="margin-bottom:12px">
+        <span class="badge" style="background:rgba(99,102,241,.12);color:var(--accent)">${esc(benefit.srvPvsnNm)}</span>
+        ${benefit.onapPsbltYn === 'Y' ? `<span class="badge" style="background:rgba(16,185,129,.12);color:var(--success);margin-left:4px">온라인 신청 가능</span>` : ''}
+      </div>` : ''}
+
+    <!-- 로컬 조건 정보 (WELFARE_DB 항목) -->
+    ${!benefit.fromAPI ? `
+      <div class="detail-section">
+        <div class="detail-section-title">신청 자격</div>
+        <div class="conditions-list">
+          ${benefit.ageRange ? `<div class="condition-item"><span class="condition-icon">✓</span> 나이: ${benefit.ageRange[0]}~${benefit.ageRange[1]}세</div>` : ''}
+          ${benefit.conditions?.maxIncome ? `<div class="condition-item"><span class="condition-icon">✓</span> 소득: 기준 중위소득 ${benefit.conditions.maxIncome}% 이하</div>` : ''}
+          ${benefit.conditions?.disability ? `<div class="condition-item"><span class="condition-icon">✓</span> 장애인 등록 필수</div>` : ''}
+          ${benefit.conditions?.pregnant ? `<div class="condition-item"><span class="condition-icon">✓</span> 임산부 대상</div>` : ''}
+        </div>
       </div>
-    </div>
+      <div class="detail-section">
+        <div class="detail-section-title">필요 서류</div>
+        <ul class="doc-list">${(benefit.documents || []).map(d => `<li>${esc(d)}</li>`).join('')}</ul>
+      </div>` : ''}
 
-    <div class="detail-section">
-      <div class="detail-section-title">필요 서류</div>
-      <ul class="doc-list">
-        ${(benefit.documents || []).map(d => `<li>${esc(d)}</li>`).join('')}
-      </ul>
-    </div>
-
-    <div class="detail-section">
-      <div class="detail-section-title">처리 기간</div>
-      <div style="font-size:.9rem;color:var(--text-muted)">평균 ${benefit.processDays || 30}일</div>
-    </div>
-
-    <div class="detail-section">
-      <div class="detail-section-title">신청 난이도</div>
-      ${difficultyBadge(benefit.difficulty)}
-    </div>
-
-    ${APP.profile ? `
-      <div class="cohort-insight mt12">
-        <div style="font-size:.78rem;font-weight:700;color:var(--primary);margin-bottom:6px">👥 유사 계층 활용 현황</div>
-        <div class="cohort-insight-text">비슷한 조건의 분들 중 약 ${Math.floor(Math.random() * 30 + 50)}%가 이 혜택을 받고 있습니다.</div>
+    <!-- API 항목이면 상세 로딩 자리 -->
+    ${benefit.fromAPI ? `
+      <div id="benefit-api-detail" style="padding:16px 0">
+        <div class="typing-dots" style="justify-content:center"><span></span><span></span><span></span></div>
+        <div style="text-align:center;font-size:.78rem;color:var(--text-muted);margin-top:8px">상세 정보 불러오는 중...</div>
       </div>` : ''}
 
     <div style="display:flex;gap:10px;margin-top:20px">
-      <a href="${esc(benefit.applyUrl)}" target="_blank" rel="noopener" class="btn btn-primary" style="flex:1;text-align:center">
-        🌐 온라인 신청
+      <a href="${esc(benefit.applyUrl || 'https://www.bokjiro.go.kr')}" target="_blank" rel="noopener" class="btn btn-primary" style="flex:1;text-align:center">
+        온라인 신청
       </a>
       <button class="btn btn-ghost" style="flex:1" onclick="navigateTo('apply');closeAllModals()">
-        📋 신청 가이드
+        신청 가이드
       </button>
     </div>
     <div style="font-size:.78rem;color:var(--text-muted);text-align:center;margin-top:8px">
       방문 신청: ${esc(benefit.applyOffline || '주민센터')}
     </div>
   `;
+}
 
-  openModal('benefit-modal-overlay');
+// ── API 상세조회 → 모달 업데이트 ────────────────────────────────────
+async function fetchAndRenderBenefitDetail(servId) {
+  const slot = document.getElementById('benefit-api-detail');
+  if (!slot) return;
+
+  try {
+    const res = await fetch(`/api/welfare?servId=${encodeURIComponent(servId)}`);
+    const data = await res.json();
+
+    if (!data.success || !data.items?.[0]) {
+      slot.innerHTML = `<div style="font-size:.78rem;color:var(--text-dim)">상세 정보를 불러오지 못했습니다.</div>`;
+      return;
+    }
+
+    const d = data.items[0];
+    slot.innerHTML = renderAPIDetailSections(d);
+  } catch (e) {
+    slot.innerHTML = '';
+  }
+}
+
+// ── 상세 API 응답 렌더 ───────────────────────────────────────────────
+function renderAPIDetailSections(d) {
+  const section = (title, body) => body ? `
+    <div class="detail-section">
+      <div class="detail-section-title">${title}</div>
+      <div style="font-size:.84rem;color:var(--text);line-height:1.75;white-space:pre-wrap">${esc(body)}</div>
+    </div>` : '';
+
+  const listSection = (title, items, nameFld, linkFld) => {
+    if (!items?.length) return '';
+    return `
+      <div class="detail-section">
+        <div class="detail-section-title">${title}</div>
+        ${items.map(it => `
+          <div style="font-size:.84rem;margin-bottom:6px">
+            ${esc(it[nameFld] || '')}
+            ${it[linkFld] ? `<span style="color:var(--primary);margin-left:6px">${esc(it[linkFld])}</span>` : ''}
+          </div>`).join('')}
+      </div>`;
+  };
+
+  return `
+    ${section('지원 대상', d.tgtrDtlCn)}
+    ${section('선정 기준', d.slctCritCn)}
+    ${section('지원 내용', d.alwServCn)}
+    ${listSection('신청 방법', d.applmetList, 'servSeDetailNm', 'servSeDetailLink')}
+    ${listSection('문의처', d.inqplCtadrList, 'servSeDetailNm', 'servSeDetailLink')}
+    ${listSection('관련 사이트', d.inqplHmpgReldList, 'servSeDetailNm', 'servSeDetailLink')}
+    ${d.crtrYr ? `<div style="font-size:.72rem;color:var(--text-dim);margin-top:8px">${d.crtrYr}년 기준</div>` : ''}
+  `;
 }
 
 // ── 규칙 매칭 요약 렌더 ────────────────────────────────────────────
@@ -227,6 +284,7 @@ async function fetchWelfareAPI() {
     rows: '30',
     lifeArray: ageToLifeCode(parseInt(p.age || 30), p.pregnant),
   });
+  if (p.age) params.set('age', String(parseInt(p.age)));
   const trgCode = profileToTrgCode(p);
   if (trgCode) params.set('trgterIndvdlArray', trgCode);
 
@@ -239,16 +297,20 @@ async function fetchWelfareAPI() {
       const merged = mergeAndDedupe(APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits(), apiMatched);
       saveBenefits(merged);
       renderBenefitsPage();
-      toast(`실제 복지 데이터 ${data.items.length}건 조회 완료!`, 'success', 3000);
+      toast(`복지 데이터 ${data.items.length}건 조회 완료`, 'success', 3000);
     } else {
       const msg = data.error || data.message || '연결 실패';
-      if (statusEl) statusEl.textContent = `API 미연결 (${msg}) — 로컬 데이터만 표시`;
+      if (statusEl) {
+        statusEl.textContent = `API 오류: ${msg}`;
+        if (data.attempted) statusEl.title = data.attempted; // 마우스 올리면 URL 표시
+      }
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
-      toast('API 미연결 — 로컬 데이터만 표시됩니다', 'warn', 3000);
+      console.error('[welfare API] error:', msg, '\nattempted:', data.attempted);
     }
   } catch (e) {
-    if (statusEl) statusEl.textContent = `조회 실패: ${e.message}`;
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 실제 복지 조회'; }
+    if (statusEl) statusEl.textContent = `네트워크 오류: ${e.message}`;
+    if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
+    console.error('[welfare API]', e);
   }
 }
 
@@ -279,13 +341,15 @@ function apiItemToLocal(item) {
     amount: item.sprtCycNm || '지원 있음',
     agency: item.jurMnofNm || '중앙부처',
     description: item.servDgst || '',
+    srvPvsnNm: item.srvPvsnNm || '',       // 제공유형 (현금/바우처 등)
+    onapPsbltYn: item.onapPsbltYn || '',   // 온라인 신청 가능 여부
     conditions: {},
     ageRange: [0, 120],
     tags: (item.lifeArray || '').split(',').map(s => s.trim()).filter(Boolean),
     documents: [],
     applyUrl: item.servDtlLink || 'https://www.bokjiro.go.kr',
     applyOffline: '주민센터',
-    difficulty: 'medium',
+    difficulty: item.onapPsbltYn === 'Y' ? 'easy' : 'medium',
     processDays: 30,
     matchScore: 80,
     fromAPI: true,
