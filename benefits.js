@@ -373,7 +373,6 @@ function renderRuleMatchSummary(matched) {
 }
 
 // ── 프로필 기반 공통 파라미터 빌더 ────────────────────────────────
-// fetchWelfareAPI, runWelfareAPICheck, autoFetch 모두 여기서 파라미터를 만듦
 function buildProfileParams(profile, rows = '100') {
   const p = profile;
   const params = new URLSearchParams({ type: 'central', rows });
@@ -386,7 +385,45 @@ function buildProfileParams(profile, rows = '100') {
   return params;
 }
 
-// ── 실제 복지 API 연동 ──────────────────────────────────────────────
+// ── 지자체 파라미터 빌더 ────────────────────────────────────────────
+// 코드표 v1.0 기준: 중앙부처와 동일 코드 체계, 정렬만 arrgOrd 사용
+// age·onapPsbltYn는 서버에서 central 타입일 때만 추가하므로 type=local이면 무시됨
+function buildLocalParams(profile, rows = '100') {
+  const p = profile;
+  const params = new URLSearchParams({ type: 'local', rows, arrgOrd: '001' }); // 001=최신순
+  if (p?.age) {
+    params.set('lifeArray', ageToLifeCode(parseInt(p.age), p?.pregnant));
+    // age는 지자체 API 미지원 → 서버에서도 central일 때만 추가하므로 넘겨도 무시됨
+  }
+  const trgCode = p ? profileToTrgCode(p) : '';
+  if (trgCode) params.set('trgterIndvdlArray', trgCode);
+  return params;
+}
+
+// ── 중앙 + 지자체 병렬 호출 후 합산 ──────────────────────────────────
+async function fetchBothAPIs(profile, rows = '100') {
+  const [centralResult, localResult] = await Promise.allSettled([
+    fetch(`/api/welfare?${buildProfileParams(profile, rows)}`).then(r => r.json()),
+    fetch(`/api/welfare?${buildLocalParams(profile, rows)}`).then(r => r.json()),
+  ]);
+
+  const centralData = centralResult.status === 'fulfilled' ? centralResult.value : { success: false };
+  const localData   = localResult.status === 'fulfilled'   ? localResult.value   : { success: false };
+
+  const centralItems = centralData.success ? (centralData.items || []).map(i => ({ ...i, _src: 'central' })) : [];
+  const localItems   = localData.success   ? (localData.items   || []).map(i => ({ ...i, _src: 'local'   })) : [];
+
+  return {
+    centralData,
+    localData,
+    allItems:   [...centralItems, ...localItems],
+    totalCount: (centralData.totalCount || 0) + (localData.totalCount || 0),
+    centralCount: centralItems.length,
+    localCount:   localItems.length,
+  };
+}
+
+// ── 실제 복지 API 연동 (중앙 + 지자체 병렬) ────────────────────────
 async function fetchWelfareAPI() {
   const p = APP.profile;
   if (!p) { toast('프로필을 먼저 입력해주세요', 'warn'); navigateTo('profile'); return; }
@@ -394,30 +431,25 @@ async function fetchWelfareAPI() {
   const btn = document.getElementById('btn-fetch-api');
   const statusEl = document.getElementById('api-fetch-status');
   if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
-  if (statusEl) statusEl.textContent = '복지 데이터를 가져오는 중...';
+  if (statusEl) statusEl.textContent = '중앙부처 + 지자체 복지 데이터를 가져오는 중...';
 
   try {
-    const res = await fetch(`/api/welfare?${buildProfileParams(p, '100')}`);
-    const data = await res.json();
+    const { allItems, totalCount, centralCount, localCount, centralData } = await fetchBothAPIs(p, '100');
 
-    if (data.success) {
-      const apiItems = (data.items || []).map(apiItemToLocal);
-      // API 결과를 로컬 규칙 매칭과 합산 (중복 제거)
-      const merged = mergeAndDedupe(matchBenefits(), apiItems);
+    if (allItems.length > 0) {
+      const apiItems = allItems.map(apiItemToLocal);
+      const merged   = mergeAndDedupe(matchBenefits(), apiItems);
       saveBenefits(merged);
       renderBenefitsPage();
 
-      const loaded = apiItems.length;
-      const total  = data.totalCount || loaded;
-      toast(`API ${loaded}건 로드 (전체 ${total}건)`, 'success', 3000);
-
+      toast(`중앙 ${centralCount}건 + 지자체 ${localCount}건 로드 (전체 ${totalCount}건)`, 'success', 4000);
       if (statusEl) statusEl.textContent =
-        `API ${loaded}건 로드됨 · 전체 ${total}건 중${total > loaded ? ` (${total - loaded}건 더 있음)` : ' (전체 로드됨)'}`;
+        `중앙부처 ${centralCount}건 + 지자체 ${localCount}건 · 전체 ${totalCount}건`;
     } else {
-      const msg = data.error || '연결 실패';
+      const msg = centralData.error || '결과 없음';
       if (statusEl) statusEl.textContent = `오류: ${msg}`;
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }
-      console.error('[welfare API]', msg, data.attempted);
+      console.error('[welfare API]', msg);
     }
   } catch (e) {
     if (statusEl) statusEl.textContent = `네트워크 오류: ${e.message}`;
@@ -541,32 +573,36 @@ async function fetchWelfareWithFallback(extracted, profile, originalQuery) {
     return p;
   };
 
-  // 시도 순서: 좁은 → 넓은. 각각 유효한 파라미터 있을 때만 추가
-  const attempts = [
-    // 1차: 추출된 파라미터 전체
-    kw || life ? { keyword: kw, lifeArray: life, trgterIndvdlArray: trg, intrsThemaArray: thm } : null,
-    // 2차: 키워드 + 생애주기
-    (kw && life) ? { keyword: kw, lifeArray: life } : null,
-    // 3차: 키워드만
-    kw ? { keyword: kw } : null,
-    // 4차: 생애주기만
-    life ? { lifeArray: life } : null,
-    // 5차: 원본 쿼리를 키워드로 (항상 실행)
-    originalQuery ? { keyword: originalQuery } : null,
+  // 시도 순서: 중앙(좁은→넓은) → 지자체(넓은)
+  const centralAttempts = [
+    kw || life ? { type:'central', keyword: kw, lifeArray: life, trgterIndvdlArray: trg, intrsThemaArray: thm } : null,
+    (kw && life) ? { type:'central', keyword: kw, lifeArray: life } : null,
+    kw ? { type:'central', keyword: kw } : null,
+    life ? { type:'central', lifeArray: life } : null,
+    originalQuery ? { type:'central', keyword: originalQuery } : null,
   ].filter(Boolean);
 
-  console.log('[AI검색] 시도할 attempt 수:', attempts.length, attempts);
+  const localAttempts = [
+    kw ? { type:'local', keyword: kw, lifeArray: life, arrgOrd: '001' } : null,
+    originalQuery ? { type:'local', keyword: originalQuery, arrgOrd: '001' } : null,
+    life ? { type:'local', lifeArray: life, arrgOrd: '001' } : null,
+  ].filter(Boolean);
+
+  const attempts = [...centralAttempts, ...localAttempts];
+  console.log('[AI검색] 시도할 attempt 수:', attempts.length);
 
   for (let i = 0; i < attempts.length; i++) {
     const attempt = attempts[i];
-    const params = makeBase();
+    const params  = makeBase();
+    params.set('type', attempt.type || 'central');
     if (attempt.keyword)           params.set('keyword', attempt.keyword);
     if (attempt.lifeArray)         params.set('lifeArray', attempt.lifeArray);
     if (attempt.trgterIndvdlArray) params.set('trgterIndvdlArray', attempt.trgterIndvdlArray);
     if (attempt.intrsThemaArray)   params.set('intrsThemaArray', attempt.intrsThemaArray);
+    if (attempt.arrgOrd)           params.set('arrgOrd', attempt.arrgOrd);
 
-    const url = `/api/welfare?${params}`;
-    console.log(`[AI검색] ${i+1}차 시도:`, url);
+    const url  = `/api/welfare?${params}`;
+    console.log(`[AI검색] ${i+1}차(${attempt.type}):`, url);
 
     const res  = await fetch(url);
     const data = await res.json();
@@ -574,7 +610,7 @@ async function fetchWelfareWithFallback(extracted, profile, originalQuery) {
 
     if (data.success && data.items?.length > 0) return data.items;
     if (!data.success && data.error && !data.error.includes('NO DATA')) {
-      throw new Error(data.error); // 진짜 오류(키 오류 등)만 중단
+      throw new Error(data.error);
     }
   }
   return [];
@@ -666,10 +702,25 @@ function renderSearchResults() {
 
   if (status === 'done') return `
     <div style="margin-top:14px">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-        <span class="badge" style="background:rgba(16,185,129,.12);color:var(--success)">${esc(intent)}</span>
-        ${_extractedParamBadges(extracted)}
-        <span style="font-size:.74rem;color:var(--text-muted)">${results.length}건</span>
+      <!-- 결과 헤더 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="badge" style="background:rgba(0,192,115,.12);color:var(--success)">${esc(intent)}</span>
+          ${_extractedParamBadges(extracted)}
+          <span style="font-size:.74rem;color:var(--text-muted)">${results.length}건</span>
+        </div>
+        <!-- 음성으로 듣기 버튼 (핵심 차별점) -->
+        <button onclick="readSearchResultsAloud()"
+          style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;
+                 border:1.5px solid var(--success);background:rgba(0,192,115,.08);
+                 color:var(--success);font-size:.78rem;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          음성으로 듣기
+        </button>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px">
         ${results.map(b => renderBenefitCard(b)).join('')}
@@ -692,6 +743,47 @@ function _extractedParamBadges(ex) {
     ex.trgterIndvdlArray && `<span class="badge" style="background:var(--bg3);color:var(--text-muted)">${trgLabels[ex.trgterIndvdlArray] || ex.trgterIndvdlArray}</span>`,
     ex.intrsThemaArray && `<span class="badge" style="background:var(--bg3);color:var(--text-muted)">${themeLabels[ex.intrsThemaArray] || ex.intrsThemaArray}</span>`,
   ].filter(Boolean).join('');
+}
+
+// ── 검색 결과 → TTS 음성 재생 ─────────────────────────────────────
+function readSearchResultsAloud() {
+  const results = BenefitsSearch.results;
+  if (!results.length) return;
+
+  const p     = APP.profile;
+  const name  = p?.name ? `${p.name}님, ` : '';
+  const intent = BenefitsSearch.intent || '맞춤 복지';
+
+  // 음성 스크립트 생성
+  const intro  = `${name}${intent} 관련 혜택 ${results.length}가지를 안내해 드립니다.`;
+  const items  = results.slice(0, 3).map((b, i) =>
+    `${i+1}번, ${b.name}입니다. ${b.agency}에서 지원하며, ${b.description || b.amount || '자세한 내용은 주민센터에 문의하세요.'}`
+  ).join(' ');
+  const outro  = `신청은 복지로 홈페이지 또는 가까운 주민센터를 방문해 주세요.`;
+
+  const script = `${intro} ${items} ${outro}`;
+
+  // voice.js의 TTS 활용
+  if (typeof Voice !== 'undefined' && Voice.synth) {
+    Voice.synth.cancel();
+    const utt = new SpeechSynthesisUtterance(script);
+    utt.lang = 'ko-KR';
+    utt.rate = 0.88;
+    Voice.synth.speak(utt);
+    toast('음성 안내를 시작합니다', 'success', 2000);
+  } else {
+    // voice.js 없으면 Web Speech API 직접 사용
+    if (!('speechSynthesis' in window)) { toast('이 브라우저는 음성을 지원하지 않습니다', 'warn'); return; }
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(script);
+    utt.lang = 'ko-KR'; utt.rate = 0.88;
+    window.speechSynthesis.speak(utt);
+    toast('음성 안내를 시작합니다', 'success', 2000);
+  }
+
+  // 음성 페이지로 이동해 TTS 컨트롤 표시
+  navigateTo('voice');
+  setTimeout(() => { if (typeof switchVoiceTab === 'function') switchVoiceTab('radio'); }, 200);
 }
 
 // ── 검색 결과 DOM 갱신 ────────────────────────────────────────────
@@ -794,25 +886,25 @@ async function runWelfareAPICheck() {
   _refreshAPICheckCard();
 
   const p = APP.profile;
-  // 실제 복지 조회와 동일한 파라미터 사용 (rows=100)
-  const params = buildProfileParams(p, '100');
-
   try {
-    const res = await fetch(`/api/welfare?${params}`);
-    const data = await res.json();
+    const { allItems, totalCount, centralCount, localCount, centralData } =
+      await fetchBothAPIs(p, '20'); // 점검용은 20건만
 
-    if (data.success) {
-      WelfareAPITest.status = data.items?.length ? 'ok' : 'empty';
+    if (allItems.length > 0) {
+      WelfareAPITest.status = 'ok';
       WelfareAPITest.result = {
-        totalCount: data.totalCount || 0,
-        count: data.items?.length || 0,
-        firstItem: data.items?.[0] || null,
+        totalCount,
+        count: allItems.length,
+        centralCount,
+        localCount,
+        firstItem: allItems[0] || null,
       };
     } else {
-      WelfareAPITest.status = 'error';
+      WelfareAPITest.status = centralData?.success === false ? 'error' : 'empty';
       WelfareAPITest.result = {
-        error: data.error || data.message || '응답 없음',
-        attempted: data.attempted || '',
+        totalCount: 0, count: 0, centralCount: 0, localCount: 0,
+        error: centralData?.error || '결과 없음',
+        attempted: centralData?.attempted || '',
       };
     }
   } catch (e) {
@@ -848,8 +940,8 @@ function renderSidebarAPIWidget() {
   const label = {
     idle:    '미실행',
     loading: '점검 중...',
-    ok:      `연결됨 · ${result?.count ?? 0}건 로드 / 전체 ${result?.totalCount ?? 0}건`,
-    empty:   `연결됨 · 결과 없음 (전체 ${result?.totalCount ?? 0}건)`,
+    ok:      `연결됨 · 중앙 ${result?.centralCount ?? 0} + 지자체 ${result?.localCount ?? 0}건`,
+    empty:   '연결됨 · 결과 없음',
     error:   '오류',
   }[status] || status;
 

@@ -88,8 +88,28 @@
         <button class="nav-item" data-page="profile">
           <span class="nav-icon">👤</span><span>내 정보</span>
         </button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">당사자 — 혜택 찾기</div>
         <button class="nav-item" data-page="benefits">
-          <span class="nav-icon">🎁</span><span>혜택 조회</span>
+          <span class="nav-icon">🎁</span><span>맞춤 혜택</span>
+        </button>
+        <button class="nav-item" data-page="voice">
+          <span class="nav-icon">🔊</span><span>음성 안내</span>
+        </button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-label">전달자 — 방송·발굴</div>
+        <button class="nav-item" data-page="voice">
+          <span class="nav-icon">📣</span><span>마을방송 스크립트</span>
+        </button>
+        <button class="nav-item" data-page="admin">
+          <span class="nav-icon">🔍</span><span>사각지대 발굴</span>
+        </button>
+      </div>
+      <div class="nav-section">
+        <button class="nav-item" data-page="settings">
+          <span class="nav-icon">⚙️</span><span>설정</span>
         </button>
       </div>
     </nav>
@@ -154,10 +174,11 @@
 
   </div><!-- /main-wrapper -->
 
-  <!-- ▌바텀 네비게이션 (모바일) — 핵심 2개만 표시 -->
-  <nav class="bottom-nav" id="bottom-nav" style="justify-content:center;gap:0">
+  <!-- ▌바텀 네비게이션 -->
+  <nav class="bottom-nav" id="bottom-nav">
 
-    <button class="bottom-nav-item active" data-nav="home" style="flex:1">
+    <!-- 홈 -->
+    <button class="bottom-nav-item active" data-nav="home">
       <div class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
@@ -167,17 +188,8 @@
       <span>홈</span>
     </button>
 
-    <button class="bottom-nav-item" data-nav="profile" style="flex:1">
-      <div class="nav-icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-          <circle cx="12" cy="7" r="4"/>
-        </svg>
-      </div>
-      <span>내 정보</span>
-    </button>
-
-    <button class="bottom-nav-item" data-nav="benefits" style="flex:1">
+    <!-- 혜택 -->
+    <button class="bottom-nav-item" data-nav="benefits">
       <div class="nav-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="20 12 20 22 4 22 4 12"/>
@@ -188,6 +200,30 @@
         </svg>
       </div>
       <span>혜택</span>
+    </button>
+
+    <!-- 방송·음성 -->
+    <button class="bottom-nav-item" data-nav="voice">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+      <span>방송·음성</span>
+    </button>
+
+    <!-- 발굴 -->
+    <button class="bottom-nav-item" data-nav="admin">
+      <div class="nav-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+      </div>
+      <span>발굴</span>
     </button>
 
   </nav><!-- /bottom-nav -->

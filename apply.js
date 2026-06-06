@@ -129,55 +129,235 @@ function renderHomePage() {
   const page = document.getElementById('page-home');
   if (!page) return;
   const p = APP.profile;
+  const isDeliverer = APP.userMode === 'deliverer';
 
   page.innerHTML = `
-    <!-- 서비스 소개 -->
-    <div style="padding:20px 0 12px;text-align:center">
-      <div style="font-size:1.5rem;font-weight:900;letter-spacing:-.03em;margin-bottom:6px">복지에코</div>
-      <div style="font-size:.85rem;color:var(--text-muted);line-height:1.7">
-        나의 상황을 입력하면<br>받을 수 있는 복지를 찾아드립니다
+
+    <!-- ── 헤더 영역 ── -->
+    <div style="padding:16px 0 12px">
+      <div style="font-size:1.6rem;font-weight:900;letter-spacing:-.03em;margin-bottom:4px">복지에코</div>
+      <div style="font-size:.82rem;color:var(--text-muted)">
+        신청주의와 직권주의 사이, 복지 도달의 마지막 1마일
       </div>
     </div>
 
+    <!-- ── 모드 전환 ── -->
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button onclick="setUserMode('recipient');renderHomePage()"
+        style="flex:1;padding:9px;border-radius:10px;border:2px solid ${!isDeliverer?'var(--primary)':'var(--border)'};
+               background:${!isDeliverer?'rgba(49,130,246,.08)':'var(--bg2)'};
+               color:${!isDeliverer?'var(--primary)':'var(--text-muted)'};
+               font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit">
+        당사자 모드
+      </button>
+      <button onclick="setUserMode('deliverer');renderHomePage()"
+        style="flex:1;padding:9px;border-radius:10px;border:2px solid ${isDeliverer?'var(--success)':'var(--border)'};
+               background:${isDeliverer?'rgba(0,192,115,.08)':'var(--bg2)'};
+               color:${isDeliverer?'var(--success)':'var(--text-muted)'};
+               font-size:.8rem;font-weight:700;cursor:pointer;font-family:inherit">
+        전달자 모드
+      </button>
+    </div>
+
+    ${!isDeliverer ? renderHomeRecipient(p) : renderHomeDeliverer(p)}
+  `;
+}
+
+// ── 당사자 모드 홈 ────────────────────────────────────────────────
+function renderHomeRecipient(p) {
+  return `
+    <!-- 서비스 흐름 시각화 -->
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:20px;padding:14px 16px;background:var(--bg2);border-radius:14px;overflow-x:auto">
+      ${[
+        { num:'1', label:'상황 입력' },
+        { num:'2', label:'AI 분석' },
+        { num:'3', label:'혜택 조회' },
+        { num:'4', label:'쉬운말' },
+        { num:'5', label:'음성 안내' },
+      ].map((s, i) => `
+        <div style="flex-shrink:0;text-align:center;min-width:52px">
+          <div style="width:32px;height:32px;border-radius:50%;background:${i===0?'var(--primary)':'var(--bg3)'};
+                      border:2px solid ${i===0?'var(--primary)':'var(--border)'};
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:.72rem;font-weight:700;margin:0 auto 4px;
+                      color:${i===0?'#fff':'var(--text-dim)'}">
+            ${s.num}
+          </div>
+          <div style="font-size:.65rem;color:${i===0?'var(--primary)':'var(--text-dim)'}">
+            ${s.label}
+          </div>
+        </div>
+        ${i < 4 ? `<div style="flex:1;height:1px;background:var(--border);margin-bottom:16px;min-width:8px"></div>` : ''}
+      `).join('')}
+    </div>
+
     <!-- 메인 검색창 -->
-    <div class="card" style="margin-bottom:16px">
-      <div style="font-size:.82rem;font-weight:700;margin-bottom:10px">어떤 도움이 필요하신가요?</div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="font-size:.84rem;font-weight:700;margin-bottom:10px">어떤 도움이 필요하신가요?</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <input
-          id="home-search-input"
-          class="form-input"
-          style="flex:1"
+        <input id="home-search-input" class="form-input" style="flex:1"
           placeholder="예: 실직했어요 / 임신 중이에요 / 혼자 사는 어르신"
-          onkeydown="if(event.key==='Enter')homeSearch()"
-        >
+          onkeydown="if(event.key==='Enter')homeSearch()">
         <button class="btn btn-primary" style="white-space:nowrap" onclick="homeSearch()">검색</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         ${['실직했어요','임신 중이에요','65세 이상','장애인 지원','저소득 가구','한부모 가정'].map(ex => `
           <button onclick="homeSearchWith('${ex}')"
-            style="font-size:.72rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);cursor:pointer;font-family:inherit">
+            style="font-size:.71rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+                   background:var(--bg2);color:var(--text-muted);cursor:pointer;font-family:inherit">
             ${ex}
           </button>`).join('')}
       </div>
     </div>
 
+    <!-- 음성 안내 배너 (핵심 차별점) -->
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;
+         background:rgba(0,192,115,.06);border:1px solid rgba(0,192,115,.2);margin-bottom:12px"
+         onclick="navigateTo('voice');setTimeout(()=>{if(typeof switchVoiceTab==='function')switchVoiceTab('radio')},200)">
+      <div style="width:44px;height:44px;border-radius:14px;background:rgba(0,192,115,.12);
+                  display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+          <line x1="12" y1="19" x2="12" y2="23"/>
+          <line x1="8" y1="23" x2="16" y2="23"/>
+        </svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.88rem;font-weight:700">혜택을 음성으로 들려드립니다</div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">
+          쉬운말 변환 → TTS 재생 · 어르신도 바로 이해
+        </div>
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+
     <!-- 프로필 상태 -->
-    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer" onclick="navigateTo('profile')">
-      <div style="width:40px;height:40px;border-radius:12px;background:${p ? 'rgba(59,130,246,.12)' : 'var(--bg3)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${p ? 'var(--primary)' : 'var(--text-dim)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer;margin-bottom:12px"
+         onclick="navigateTo('profile')">
+      <div style="width:40px;height:40px;border-radius:12px;background:${p?'rgba(49,130,246,.12)':'var(--bg3)'};
+                  display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${p?'var(--primary)':'var(--text-dim)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
         </svg>
       </div>
       <div style="flex:1;min-width:0">
         ${p ? `
-          <div style="font-size:.88rem;font-weight:700">${esc(p.name || '내 정보')}</div>
-          <div style="font-size:.76rem;color:var(--text-muted)">${[p.age && p.age+'세', p.region].filter(Boolean).join(' · ') || '정보 입력됨'}</div>
+          <div style="font-size:.87rem;font-weight:700">${esc(p.name||'내 정보')}</div>
+          <div style="font-size:.75rem;color:var(--text-muted)">${[p.age&&p.age+'세',p.region].filter(Boolean).join(' · ')||'입력됨'}</div>
         ` : `
-          <div style="font-size:.88rem;font-weight:700;color:var(--text-muted)">내 정보 입력</div>
-          <div style="font-size:.76rem;color:var(--text-dim)">나이·지역 입력 시 더 정확한 결과</div>
+          <div style="font-size:.87rem;font-weight:700;color:var(--text-muted)">내 정보 입력하기</div>
+          <div style="font-size:.75rem;color:var(--text-dim)">나이·지역 입력 시 더 정확한 결과</div>
         `}
       </div>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+  `;
+}
+
+// ── 전달자 모드 홈 ────────────────────────────────────────────────
+function renderHomeDeliverer(p) {
+  return `
+    <!-- 서비스 흐름 시각화 -->
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:20px;padding:14px 16px;background:var(--bg2);border-radius:14px;overflow-x:auto">
+      ${[
+        { num:'1', label:'공문 입력' },
+        { num:'2', label:'GPT 변환' },
+        { num:'3', label:'방송 스크립트' },
+        { num:'4', label:'TTS 미리듣기' },
+      ].map((s, i) => `
+        <div style="flex-shrink:0;text-align:center;min-width:56px">
+          <div style="width:32px;height:32px;border-radius:50%;background:${i===0?'var(--success)':'var(--bg3)'};
+                      border:2px solid ${i===0?'var(--success)':'var(--border)'};
+                      display:flex;align-items:center;justify-content:center;
+                      font-size:.72rem;font-weight:700;margin:0 auto 4px;
+                      color:${i===0?'#fff':'var(--text-dim)'}">
+            ${s.num}
+          </div>
+          <div style="font-size:.65rem;color:${i===0?'var(--success)':'var(--text-dim)'}">
+            ${s.label}
+          </div>
+        </div>
+        ${i < 3 ? `<div style="flex:1;height:1px;background:var(--border);margin-bottom:16px;min-width:8px"></div>` : ''}
+      `).join('')}
+    </div>
+
+    <!-- 마을방송 스크립트 생성 배너 -->
+    <div class="card" style="cursor:pointer;margin-bottom:12px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2)"
+         onclick="navigateTo('voice');setTimeout(()=>{if(typeof switchVoiceTab==='function')switchVoiceTab('broadcast')},200)">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:14px;background:rgba(99,102,241,.12);
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6"/>
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/>
+          </svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:.92rem;font-weight:700;margin-bottom:3px">마을방송 스크립트 생성</div>
+          <div style="font-size:.76rem;color:var(--text-muted);line-height:1.5">
+            공문·행정 용어 → 어르신도 이해하는 쉬운 말<br>
+            GPT-4o 변환 · TTS 미리듣기
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+      <!-- 빠른 방송 버튼 -->
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:.72rem;color:var(--text-muted);margin-bottom:8px">자주 쓰는 복지 고지 즉시 생성</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${[
+            {label:'기초연금',type:'pension'},
+            {label:'청년 월세',type:'rent'},
+            {label:'에너지바우처',type:'energy'},
+            {label:'긴급복지',type:'urgent'},
+          ].map(b => `
+            <button onclick="event.stopPropagation();quickWelfareBroadcast('${b.type}')"
+              style="font-size:.73rem;padding:5px 12px;border-radius:20px;
+                     border:1px solid rgba(99,102,241,.3);background:rgba(99,102,241,.08);
+                     color:#6366F1;cursor:pointer;font-family:inherit">
+              ${b.label}
+            </button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- 사각지대 발굴 배너 -->
+    <div class="card" style="cursor:pointer;margin-bottom:12px;background:rgba(240,68,82,.05);border:1px solid rgba(240,68,82,.15)"
+         onclick="navigateTo('admin')">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:48px;height:48px;border-radius:14px;background:rgba(240,68,82,.1);
+                    display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:.92rem;font-weight:700;margin-bottom:3px">사각지대 발굴 대시보드</div>
+          <div style="font-size:.76rem;color:var(--text-muted);line-height:1.5">
+            지역별 미수급 현황 · 우선 발굴 대상 관리<br>
+            AI 분석 → 방송문 자동 생성
+          </div>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- 프로필 상태 -->
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer"
+         onclick="navigateTo('profile')">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--bg3);
+                  display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:.84rem;color:var(--text-muted)">
+          ${p ? `${esc(p.name||'')} · ${p.region||''} · ${p.age||''}세` : '지역 정보 입력 시 지역 맞춤 결과'}
+        </div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
   `;
 }

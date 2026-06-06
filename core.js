@@ -142,8 +142,8 @@ function showApp() {
 const PAGE_TITLES = {
   home: '복지에코', profile: '내 정보', benefits: '맞춤 혜택',
   news: '복지 뉴스', lifecycle: '생애 계획', apply: '신청 가이드',
-  settings: '설정', chat: 'AI 복지 상담', voice: '방송·음성 안내',
-  admin: '사각지대 발굴',
+  settings: '설정', chat: 'AI 복지 상담',
+  voice: '방송·음성 안내', admin: '사각지대 발굴',
 };
 
 // ── 라우터 ──────────────────────────────────────────────────────────
