@@ -110,9 +110,12 @@ export default async function handler(req, res) {
     const gwMsg = pickTag(text, 'returnAuthMsg') || pickTag(text, 'errMsg');
     if (gwCode && gwCode !== '00') throw new Error(`[${gwCode}] ${gwMsg || 'gateway error'}`);
 
-    // 2) 서비스 레벨 결과코드 (0 = 정상)
+    // 2) 서비스 레벨 결과코드 (0 = 정상, 40 = 데이터 없음(빈 결과))
     const resultCode = pickTag(text, 'resultCode');
     const resultMessage = pickTag(text, 'resultMessage');
+    if (resultCode === '40') {
+      return res.status(200).json({ success: true, type, mode, totalCount: 0, count: 0, items: [] });
+    }
     if (resultCode && resultCode !== '0' && resultCode !== '00') {
       throw new Error(`[${resultCode}] ${resultMessage || errName(resultCode)}`);
     }
