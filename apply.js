@@ -128,223 +128,59 @@ function renderApplyPage() {
 function renderHomePage() {
   const page = document.getElementById('page-home');
   if (!page) return;
-
-  const matched = APP.profile ? (APP.matchedBenefits.length ? APP.matchedBenefits : matchBenefits()) : [];
   const p = APP.profile;
-  const urgentNews = SAMPLE_NEWS.filter(n => n.urgent).slice(0, 2);
-  const isDeliverer = APP.userMode === 'deliverer';
 
   page.innerHTML = `
-
-    <!-- ── 히어로: 혜택 수 중심 ── -->
-    <div class="home-hero" style="padding-bottom:16px">
-      <div class="home-hero-label">
-        ${p ? `${esc(p.name || '')} · ${isDeliverer ? '전달자 모드' : '당사자 모드'}` : '복지에코'}
-      </div>
-      <div class="home-hero-score">
-        <span id="home-score" style="font-size:3.2rem">${p ? matched.length : '--'}</span>
-        <span style="font-size:1.1rem;margin-left:4px">개</span>
-      </div>
-      <div class="home-hero-sub">
-        ${p ? '규칙 기반 자격 판정 완료 · 지금 신청 가능한 혜택' : '나에게 맞는 복지 혜택을 찾아드립니다'}
+    <!-- 서비스 소개 -->
+    <div style="padding:20px 0 12px;text-align:center">
+      <div style="font-size:1.5rem;font-weight:900;letter-spacing:-.03em;margin-bottom:6px">복지에코</div>
+      <div style="font-size:.85rem;color:var(--text-muted);line-height:1.7">
+        나의 상황을 입력하면<br>받을 수 있는 복지를 찾아드립니다
       </div>
     </div>
 
-    <!-- ── 메인 검색창 ── -->
-    <div class="card" style="margin-bottom:14px;padding:16px">
-      <div style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:var(--text)">
-        어떤 도움이 필요하신가요?
-      </div>
+    <!-- 메인 검색창 -->
+    <div class="card" style="margin-bottom:16px">
+      <div style="font-size:.82rem;font-weight:700;margin-bottom:10px">어떤 도움이 필요하신가요?</div>
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <input
           id="home-search-input"
           class="form-input"
-          style="flex:1;font-size:.9rem"
-          placeholder="예: 실직했어요 / 임신 중이에요 / 혼자 사는 어르신이에요"
+          style="flex:1"
+          placeholder="예: 실직했어요 / 임신 중이에요 / 혼자 사는 어르신"
           onkeydown="if(event.key==='Enter')homeSearch()"
         >
-        <button class="btn btn-primary" style="white-space:nowrap;padding:0 18px" onclick="homeSearch()">
-          검색
-        </button>
+        <button class="btn btn-primary" style="white-space:nowrap" onclick="homeSearch()">검색</button>
       </div>
-      <!-- 예시 칩 -->
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${[
-          '실직했어요',
-          '임신 중이에요',
-          '65세 이상 노인',
-          '장애인 지원',
-          '저소득 가구',
-          '한부모 가정',
-        ].map(ex => `
-          <button
-            onclick="homeSearchWith('${ex}')"
+        ${['실직했어요','임신 중이에요','65세 이상','장애인 지원','저소득 가구','한부모 가정'].map(ex => `
+          <button onclick="homeSearchWith('${ex}')"
             style="font-size:.72rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--bg2);color:var(--text-muted);cursor:pointer;font-family:inherit">
             ${ex}
           </button>`).join('')}
       </div>
     </div>
 
-    <!-- ── 모드 전환 탭 ── -->
-    <div style="display:flex;gap:6px;margin-bottom:16px">
-      <button
-        style="flex:1;padding:10px;border-radius:12px;border:2px solid ${!isDeliverer ? 'var(--primary)' : 'var(--border)'};background:${!isDeliverer ? 'rgba(59,130,246,.1)' : 'var(--bg2)'};color:${!isDeliverer ? 'var(--primary)' : 'var(--text-muted)'};font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit"
-        onclick="setUserMode('recipient');renderHomePage()">
-        당사자 모드<br>
-        <span style="font-size:.72rem;font-weight:400">어르신·장애인·취약계층</span>
-      </button>
-      <button
-        style="flex:1;padding:10px;border-radius:12px;border:2px solid ${isDeliverer ? 'var(--success)' : 'var(--border)'};background:${isDeliverer ? 'rgba(16,185,129,.1)' : 'var(--bg2)'};color:${isDeliverer ? 'var(--success)' : 'var(--text-muted)'};font-size:.85rem;font-weight:700;cursor:pointer;font-family:inherit"
-        onclick="setUserMode('deliverer');renderHomePage()">
-        전달자 모드<br>
-        <span style="font-size:.72rem;font-weight:400">이장·복지사·생활지원사</span>
-      </button>
+    <!-- 프로필 상태 -->
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;cursor:pointer" onclick="navigateTo('profile')">
+      <div style="width:40px;height:40px;border-radius:12px;background:${p ? 'rgba(59,130,246,.12)' : 'var(--bg3)'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${p ? 'var(--primary)' : 'var(--text-dim)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        ${p ? `
+          <div style="font-size:.88rem;font-weight:700">${esc(p.name || '내 정보')}</div>
+          <div style="font-size:.76rem;color:var(--text-muted)">${[p.age && p.age+'세', p.region].filter(Boolean).join(' · ') || '정보 입력됨'}</div>
+        ` : `
+          <div style="font-size:.88rem;font-weight:700;color:var(--text-muted)">내 정보 입력</div>
+          <div style="font-size:.76rem;color:var(--text-dim)">나이·지역 입력 시 더 정확한 결과</div>
+        `}
+      </div>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
     </div>
-
-    <!-- ── 당사자 모드 ── -->
-    ${!isDeliverer ? `
-
-      <!-- 프로필 미입력 CTA -->
-      ${!p ? `
-        <div class="card" style="text-align:center;padding:28px 20px;margin-bottom:12px">
-          <div style="font-size:1.05rem;font-weight:900;margin-bottom:8px">지역·상황 입력 → 혜택 자동 판정</div>
-          <div style="font-size:.84rem;color:var(--text-muted);margin-bottom:20px;line-height:1.7">
-            자격 판정은 규칙 기반으로 처리되어 LLM 환각이 없습니다.<br>
-            AI는 쉬운 말 안내와 음성 상담만 담당합니다.
-          </div>
-          <button class="btn btn-primary btn-full btn-lg" onclick="navigateTo('profile')">내 정보 입력하기 →</button>
-        </div>` : ''}
-
-      <!-- 빠른 액션 -->
-      <div class="quick-actions mb12">
-        ${[
-          { icon: '🎁', label: '맞춤 혜택', page: 'benefits' },
-          { icon: '💬', label: 'AI 상담', page: 'chat' },
-          { icon: '🔊', label: '음성 안내', page: 'voice' },
-          { icon: '📰', label: '복지 뉴스', page: 'news' },
-        ].map(qa => `
-          <button class="qa-btn" onclick="navigateTo('${qa.page}')">
-            <div class="qa-icon">${qa.icon}</div>
-            <div class="qa-label">${esc(qa.label)}</div>
-          </button>`).join('')}
-      </div>
-
-      <!-- 맞춤 혜택 TOP3 -->
-      ${p && matched.length ? `
-        <div class="section-header">
-          <div class="section-title">규칙 판정 — 받을 수 있는 혜택 TOP 3</div>
-          <div class="section-link" onclick="navigateTo('benefits')">전체보기</div>
-        </div>
-        <div class="benefit-list-group mb12">
-          ${matched.slice(0, 3).map(b => renderBenefitCard(b)).join('')}
-        </div>` : ''}
-
-      <!-- 당사자 음성 안내 배너 -->
-      <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer;background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.2);margin-bottom:10px" onclick="navigateTo('voice');setTimeout(()=>switchVoiceTab('radio'),200)">
-        <div style="width:44px;height:44px;border-radius:14px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🔊</div>
-        <div style="flex:1">
-          <div style="font-weight:700">쉬운말 음성으로 듣기</div>
-          <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">내 혜택 소식을 어르신도 이해할 수 있게</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-
-      <!-- AI 상담 배너 -->
-      <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer;margin-bottom:10px" onclick="navigateTo('chat')">
-        <div style="width:44px;height:44px;border-radius:14px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">💬</div>
-        <div style="flex:1">
-          <div style="font-weight:700">AI 복지 상담사에게 물어보기</div>
-          <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">쉬운 말로 혜택 조건·신청 방법 안내</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-
-    ` : `
-
-    <!-- ── 전달자 모드 ── -->
-
-      <!-- 빠른 액션 -->
-      <div class="quick-actions mb12">
-        ${[
-          { icon: '🚨', label: '사각지대 발굴', page: 'admin' },
-          { icon: '📣', label: '마을방송', page: 'voice' },
-          { icon: '🎁', label: '복지 조회', page: 'benefits' },
-          { icon: '📰', label: '복지 뉴스', page: 'news' },
-        ].map(qa => `
-          <button class="qa-btn" onclick="navigateTo('${qa.page}')">
-            <div class="qa-icon">${qa.icon}</div>
-            <div class="qa-label">${esc(qa.label)}</div>
-          </button>`).join('')}
-      </div>
-
-      <!-- 사각지대 발굴 배너 -->
-      <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);margin-bottom:10px" onclick="navigateTo('admin')">
-        <div style="width:44px;height:44px;border-radius:14px;background:rgba(239,68,68,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏛️</div>
-        <div style="flex:1">
-          <div style="font-weight:700">사각지대 발굴 대시보드</div>
-          <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">지역별 미수급 현황 · 우선 발굴 대상 관리</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-
-      <!-- 마을방송 스크립트 배너 -->
-      <div class="card card-hover" style="display:flex;align-items:center;gap:16px;cursor:pointer;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.2);margin-bottom:10px" onclick="navigateTo('voice');setTimeout(()=>switchVoiceTab('broadcast'),200)">
-        <div style="width:44px;height:44px;border-radius:14px;background:rgba(99,102,241,.12);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">📣</div>
-        <div style="flex:1">
-          <div style="font-weight:700">공문 → 마을방송 스크립트 생성</div>
-          <div style="font-size:.82rem;color:var(--text-muted);margin-top:2px">행정 공문을 어르신도 이해할 수 있는 쉬운 말로</div>
-        </div>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-dim);flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
-      </div>
-
-      <!-- 복지 고지 빠른 방송 -->
-      <div class="section-header">
-        <div class="section-title">복지 고지 빠른 방송</div>
-      </div>
-      <div class="card" style="padding:12px;margin-bottom:12px">
-        <div style="font-size:.77rem;color:var(--text-muted);margin-bottom:10px">자주 안내하는 복지 혜택을 즉시 방송문으로 생성합니다</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="emergency-quick-btn" style="background:rgba(99,102,241,.12);color:#6366F1" onclick="quickWelfareBroadcast('pension')">
-            <span style="font-size:1.2rem">👴</span>기초연금
-          </button>
-          <button class="emergency-quick-btn" style="background:rgba(59,130,246,.12);color:#3B82F6" onclick="quickWelfareBroadcast('rent')">
-            <span style="font-size:1.2rem">🏠</span>청년 월세
-          </button>
-          <button class="emergency-quick-btn" style="background:rgba(245,158,11,.12);color:#F59E0B" onclick="quickWelfareBroadcast('energy')">
-            <span style="font-size:1.2rem">💡</span>에너지바우처
-          </button>
-          <button class="emergency-quick-btn" style="background:rgba(239,68,68,.12);color:#EF4444" onclick="quickWelfareBroadcast('urgent')">
-            <span style="font-size:1.2rem">🆘</span>긴급복지
-          </button>
-        </div>
-      </div>
-
-    `}
-
-    <!-- ── 긴급 뉴스 (공통) ── -->
-    ${urgentNews.length ? `
-      <div class="section-header">
-        <div class="section-title">긴급 복지 소식</div>
-        <div class="section-link" onclick="navigateTo('news')">더보기</div>
-      </div>
-      <div style="border-radius:var(--radius);overflow:hidden;margin-bottom:12px">
-        ${urgentNews.map((n, i) => `
-          <div class="news-card${i === 0 ? ' rounded-top' : ''}${i === urgentNews.length-1 ? ' rounded-bottom' : ''}" onclick="navigateTo('news')">
-            <div class="news-urgent-dot"></div>
-            <div class="news-body">
-              <div class="news-title">${esc(n.title)}</div>
-              <div class="news-meta"><span>${esc(n.source)}</span><span>·</span><span>${relDate(n.date)}</span></div>
-            </div>
-          </div>`).join('')}
-      </div>` : ''}
   `;
-
-  if (p) {
-    setTimeout(() => {
-      const el = document.getElementById('home-score');
-      if (el) countUp(el, matched.length, 500);
-    }, 100);
-  }
+}
 }
 
 // ── 홈 검색 진입 ─────────────────────────────────────────────────

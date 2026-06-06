@@ -20,10 +20,12 @@ export default async function handler(req, res) {
     });
   }
 
-  const { messages, temperature = 0.7, max_tokens = 800 } = req.body || {};
+  const { messages, temperature = 0.7, max_tokens = 800, model } = req.body || {};
   if (!Array.isArray(messages) || !messages.length) {
     return res.status(400).json({ success: false, error: 'messages 배열 필수' });
   }
+  // 쉬운말 변환 등 품질이 중요한 작업은 gpt-4o, 나머지는 gpt-4o-mini
+  const gptModel = model === 'gpt-4o' ? 'gpt-4o' : 'gpt-4o-mini';
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -32,7 +34,7 @@ export default async function handler(req, res) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({ model: 'gpt-4o-mini', messages, temperature, max_tokens }),
+      body: JSON.stringify({ model: gptModel, messages, temperature, max_tokens }),
     });
 
     if (!response.ok) {

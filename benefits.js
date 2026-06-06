@@ -2,6 +2,7 @@
 
 let benefitsFilter = 'all';
 let selectedBenefitId = null;
+const SimplifyState = {}; // { [id]: 'idle'|'loading'|'done', text? }
 
 // ── AI 검색 상태 ─────────────────────────────────────────────────────
 const BenefitsSearch = {
@@ -100,10 +101,11 @@ function renderBenefitsPage() {
 
 function renderBenefitCard(b) {
   const cat = BENEFIT_CATEGORIES[b.category] || { icon: '📋', color: '#64748B', label: b.category };
-  const matchPct = b.matchScore || 75;
+  const state = SimplifyState[b.id];
+
   return `
-    <div class="benefit-card" onclick="openBenefitDetail('${b.id}')">
-      <div class="benefit-card-header">
+    <div class="benefit-card" id="bcard-${b.id}">
+      <div class="benefit-card-header" onclick="openBenefitDetail('${b.id}')" style="cursor:pointer">
         <div class="benefit-cat-icon" style="background:${cat.color}20">
           <span style="font-size:1.2rem">${cat.icon}</span>
         </div>
@@ -111,23 +113,75 @@ function renderBenefitCard(b) {
           <div class="benefit-name">${esc(b.name)}</div>
           <div class="benefit-agency">${esc(b.agency)}</div>
         </div>
-        <div style="text-align:right;flex-shrink:0">
-          ${difficultyBadge(b.difficulty)}
-        </div>
       </div>
-      <div class="benefit-amount">${esc(b.amount)}</div>
-      <div class="benefit-desc">${esc(b.description)}</div>
-      <div class="benefit-footer">
-        <div class="benefit-tags">
-          ${(b.tags || []).slice(0, 2).map(t => `<span class="tag">${esc(t)}</span>`).join('')}
-        </div>
-        <div class="match-score">
-          <span>매칭</span>
-          <div class="match-bar"><div class="match-fill" style="width:${matchPct}%"></div></div>
-          <span style="color:var(--primary);font-weight:700">${matchPct}%</span>
-        </div>
+      <div class="benefit-amount">${esc(b.amount || '')}</div>
+
+      <!-- 원문 설명 -->
+      <div class="benefit-desc" id="bdesc-${b.id}">${esc(b.description || '')}</div>
+
+      <!-- 쉬운말 결과 -->
+      ${state?.status === 'done' ? `
+        <div style="margin-top:10px;padding:10px;background:rgba(59,130,246,.06);border-radius:8px;border-left:3px solid var(--primary)">
+          <div style="font-size:.72rem;font-weight:700;color:var(--primary);margin-bottom:4px">쉬운 말 설명</div>
+          <div style="font-size:.84rem;color:var(--text);line-height:1.7">${esc(state.text || '')}</div>
+        </div>` : ''}
+
+      <!-- 쉬운말 버튼 -->
+      <div style="margin-top:10px;display:flex;justify-content:flex-end">
+        ${state?.status === 'loading'
+          ? `<span style="font-size:.75rem;color:var(--text-muted)">변환 중...</span>`
+          : state?.status === 'done'
+            ? `<button onclick="simplifyBenefit('${b.id}')" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-family:inherit">다시 변환</button>`
+            : `<button onclick="simplifyBenefit('${b.id}')" style="font-size:.75rem;padding:5px 12px;border-radius:8px;border:1px solid var(--primary);background:transparent;color:var(--primary);cursor:pointer;font-family:inherit;font-weight:600">쉬운말로 보기</button>`
+        }
       </div>
     </div>`;
+}
+
+// ── 쉬운말 변환 (gpt-4o) ─────────────────────────────────────────
+async function simplifyBenefit(id) {
+  const b = APP.matchedBenefits.find(x => x.id === id) || WELFARE_DB.find(x => x.id === id);
+  if (!b) return;
+
+  SimplifyState[id] = { status: 'loading' };
+  _rerenderCard(id, b);
+
+  const text = [b.name, b.agency, b.description, b.amount].filter(Boolean).join('\n');
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        temperature: 0.3,
+        max_tokens: 300,
+        messages: [
+          { role: 'system', content: `당신은 복지 서비스 안내를 쉬운 말로 바꿔주는 전문가입니다.
+어르신·장애인도 이해할 수 있게 다음 규칙을 지키세요:
+- 어려운 행정 용어 → 일상 언어로
+- 대상이 누구인지, 얼마를 받는지, 어디서 신청하는지 포함
+- 200자 이내, 따뜻하고 친근한 말투
+- 설명 텍스트만 출력 (제목·라벨 없이)` },
+          { role: 'user', content: text },
+        ],
+      }),
+    });
+    const data = await res.json();
+    SimplifyState[id] = { status: 'done', text: data.success ? data.content : '변환 실패' };
+  } catch (e) {
+    SimplifyState[id] = { status: 'done', text: '변환 중 오류가 발생했습니다.' };
+  }
+
+  _rerenderCard(id, b);
+}
+
+function _rerenderCard(id, b) {
+  const el = document.getElementById(`bcard-${id}`);
+  if (!el) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = renderBenefitCard(b);
+  el.replaceWith(tmp.firstElementChild);
 }
 
 // ── 혜택 필터 ────────────────────────────────────────────────────────
@@ -432,25 +486,15 @@ async function searchBenefitsWithAI(query) {
     BenefitsSearch.status = 'fetching';
     updateSearchResultsUI();
 
-    // ── 2단계: 복지 API 호출 ──────────────────────────────────────
-    const urlParams = new URLSearchParams({ type: 'central', rows: '20' });
-    if (extracted.keyword)             urlParams.set('keyword', extracted.keyword);
-    if (extracted.lifeArray)           urlParams.set('lifeArray', extracted.lifeArray);
-    if (extracted.trgterIndvdlArray)   urlParams.set('trgterIndvdlArray', extracted.trgterIndvdlArray);
-    if (extracted.intrsThemaArray)     urlParams.set('intrsThemaArray', extracted.intrsThemaArray);
-
-    // 프로필 age는 항상 포함 (필터 정확도 향상)
+    // ── 2단계: 복지 API 호출 (빈 결과 시 파라미터 축소 재시도) ────
     const p = APP.profile;
-    if (p?.age) urlParams.set('age', String(parseInt(p.age)));
+    const items = await fetchWelfareWithFallback(extracted, p);
 
-    const res = await fetch(`/api/welfare?${urlParams}`);
-    const data = await res.json();
-
-    if (data.success && data.items?.length) {
-      BenefitsSearch.results = data.items.map(apiItemToLocal);
+    if (items.length) {
+      BenefitsSearch.results = items.map(apiItemToLocal);
       BenefitsSearch.status = 'done';
     } else {
-      BenefitsSearch.error = data.error || '해당 조건의 혜택을 찾지 못했습니다';
+      BenefitsSearch.error = '해당 조건의 혜택을 찾지 못했습니다. 다른 표현으로 검색해보세요.';
       BenefitsSearch.status = 'error';
     }
   } catch (e) {
@@ -459,6 +503,43 @@ async function searchBenefitsWithAI(query) {
   }
 
   updateSearchResultsUI();
+}
+
+// ── 단계적 fallback API 호출 ──────────────────────────────────────
+// 파라미터가 많을수록 결과가 없을 수 있으므로 점진적으로 줄여서 재시도
+async function fetchWelfareWithFallback(extracted, profile) {
+  const base = new URLSearchParams({ type: 'central', rows: '20' });
+  if (profile?.age) base.set('age', String(parseInt(profile.age)));
+
+  // 시도할 파라미터 조합 (좁은 → 넓은 순서)
+  const attempts = [
+    // 1차: 전체 파라미터
+    { keyword: extracted.keyword, lifeArray: extracted.lifeArray,
+      trgterIndvdlArray: extracted.trgterIndvdlArray, intrsThemaArray: extracted.intrsThemaArray },
+    // 2차: 관심주제 제외
+    { keyword: extracted.keyword, lifeArray: extracted.lifeArray,
+      trgterIndvdlArray: extracted.trgterIndvdlArray },
+    // 3차: 키워드 + 생애주기만
+    { keyword: extracted.keyword, lifeArray: extracted.lifeArray },
+    // 4차: 키워드만
+    { keyword: extracted.keyword },
+    // 5차: 생애주기만 (키워드 없을 때 대비)
+    { lifeArray: extracted.lifeArray },
+  ].filter(a => Object.values(a).some(v => v)); // 빈 시도 제거
+
+  for (const attempt of attempts) {
+    const params = new URLSearchParams(base);
+    if (attempt.keyword)           params.set('keyword', attempt.keyword);
+    if (attempt.lifeArray)         params.set('lifeArray', attempt.lifeArray);
+    if (attempt.trgterIndvdlArray) params.set('trgterIndvdlArray', attempt.trgterIndvdlArray);
+    if (attempt.intrsThemaArray)   params.set('intrsThemaArray', attempt.intrsThemaArray);
+
+    const res = await fetch(`/api/welfare?${params}`);
+    const data = await res.json();
+    if (data.success && data.items?.length) return data.items;
+    if (!data.success && data.error) throw new Error(data.error); // 진짜 오류는 즉시 중단
+  }
+  return [];
 }
 
 // ── GPT 의도 분석: 자유 텍스트 → welfare API 파라미터 JSON ─────────
@@ -537,6 +618,12 @@ function renderSearchResults() {
     <div style="padding:12px 0">
       <div style="font-size:.82rem;color:var(--danger)">${esc(error)}</div>
       <div style="font-size:.75rem;color:var(--text-dim);margin-top:4px">다른 표현으로 다시 검색해보세요</div>
+    </div>`;
+
+  if (status === 'done' && results.length === 0) return `
+    <div style="padding:16px 0;text-align:center">
+      <div style="font-size:.88rem;font-weight:700;margin-bottom:6px">검색 결과가 없습니다</div>
+      <div style="font-size:.78rem;color:var(--text-muted)">다른 표현으로 다시 검색해보세요</div>
     </div>`;
 
   if (status === 'done') return `
