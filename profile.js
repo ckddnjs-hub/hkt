@@ -484,31 +484,29 @@ async function autoFetchWelfareOnProfileSave() {
   if (statusEl) statusEl.textContent = '복지 데이터를 조회하는 중...';
   if (btn) { btn.disabled = true; btn.textContent = '조회 중...'; }
 
-  const params = typeof buildProfileParams === 'function'
-    ? buildProfileParams(p, '100')
-    : (() => {
-        const q = new URLSearchParams({ type: 'central', rows: '100' });
-        if (p.age) {
-          q.set('lifeArray', ageToLifeCode(parseInt(p.age), p.pregnant));
-          q.set('age', String(parseInt(p.age)));
-        }
-        const trg = profileToTrgCode(p);
-        if (trg) q.set('trgterIndvdlArray', trg);
-        return q;
-      })();
-
   try {
-    const res  = await fetch(`/api/welfare?${params}`);
-    const data = await res.json();
+    // 중앙부처 + 지자체 병렬 호출 (benefits.js의 fetchBothAPIs 활용)
+    const { allItems, totalCount, centralCount, localCount } =
+      typeof fetchBothAPIs === 'function'
+        ? await fetchBothAPIs(p, '100')
+        : await (async () => {
+            const res  = await fetch(`/api/welfare?type=central&rows=100`);
+            const data = await res.json();
+            return { allItems: data.items || [], totalCount: data.totalCount || 0, centralCount: data.items?.length || 0, localCount: 0 };
+          })();
 
-    if (data.success) {
-      const apiItems = (data.items || []).map(apiItemToLocal);
-      const merged   = mergeAndDedupe(matchBenefits(), apiItems);
-      saveBenefits(merged);
+    if (allItems.length > 0) {
+      const apiItems = allItems.map(apiItemToLocal);
+      saveBenefits(apiItems); // API 결과만 저장
+      if (typeof _apiPage !== 'undefined') {
+        _apiPage   = 1;
+        _sortedAPI = typeof sortByRelevance === 'function'
+          ? sortByRelevance(apiItems, p) : apiItems;
+      }
       renderBenefitsPage();
-      const name  = p.name ? `${p.name}님 — ` : '';
-      const total = data.totalCount || apiItems.length;
-      toast(`${name}${apiItems.length}건 로드 완료 (전체 ${total}건)`, 'success', 3000);
+      const name = p.name ? `${p.name}님 — ` : '';
+      toast(`${name}중앙 ${centralCount}건 + 지자체 ${localCount}건 (전체 ${totalCount}건)`, 'success', 4000);
+      if (statusEl) statusEl.textContent = `중앙부처 ${centralCount}건 + 지자체 ${localCount}건 로드됨`;
     } else {
       if (statusEl) statusEl.textContent = `API 오류 — 로컬 데이터 표시 중`;
       if (btn) { btn.disabled = false; btn.textContent = '다시 조회'; }

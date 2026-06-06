@@ -2,6 +2,9 @@
 
 let benefitsFilter = 'all';
 let selectedBenefitId = null;
+let _apiPage = 1;           // API 결과 현재 페이지
+let _sortedAPI = [];        // 관련성 정렬된 API 결과 캐시
+const API_PAGE_SIZE = 5;
 
 // ── AI 검색 상태 ─────────────────────────────────────────────────────
 const BenefitsSearch = {
@@ -23,79 +26,171 @@ function renderBenefitsPage() {
   const page = document.getElementById('page-benefits');
   if (!page) return;
 
-  const matched = APP.profile ? matchBenefits() : [];
-  if (matched.length && !APP.matchedBenefits.length) saveBenefits(matched);
-  const benefits = matched.length ? matched : APP.matchedBenefits;
+  // 규칙 기반 로컬 매칭 (확실한 매칭)
+  const ruleMatched = APP.profile ? matchBenefits() : [];
+
+  // API로 받은 항목만 분리
+  const apiItems = APP.matchedBenefits.filter(b => b.fromAPI);
+
+  // API 결과: 관련성 정렬 후 캐시
+  _apiPage    = 1;
+  _sortedAPI  = sortByRelevance(apiItems, APP.profile);
 
   page.innerHTML = `
     <div class="page-title">맞춤 복지 혜택</div>
-    <div class="page-sub">규칙 기반으로 판정된 나만의 혜택 목록</div>
 
     <!-- AI 복지 검색 -->
     <div class="card mb16">
       <div style="font-size:.84rem;font-weight:700;margin-bottom:8px">어떤 도움이 필요하신가요?</div>
-      <div style="font-size:.76rem;color:var(--text-muted);margin-bottom:10px">
-        상황을 자유롭게 입력하면 AI가 의도를 분석해 맞는 복지 혜택을 찾아드립니다
-      </div>
       <div style="display:flex;gap:8px">
-        <input
-          id="benefits-search-input"
-          class="form-input"
-          style="flex:1"
-          placeholder="예: 최근 실직했어요 / 임신 중인데 지원받고 싶어요 / 혼자 사는 어르신이에요"
-          onkeydown="if(event.key==='Enter')searchBenefitsWithAI(this.value)"
-        >
-        <button class="btn btn-primary" style="white-space:nowrap" onclick="searchBenefitsWithAI(document.getElementById('benefits-search-input').value)">
-          검색
-        </button>
+        <input id="benefits-search-input" class="form-input" style="flex:1"
+          placeholder="예: 실직했어요 / 임신 중이에요 / 혼자 사는 어르신"
+          onkeydown="if(event.key==='Enter')searchBenefitsWithAI(this.value)">
+        <button class="btn btn-primary" style="white-space:nowrap"
+          onclick="searchBenefitsWithAI(document.getElementById('benefits-search-input').value)">검색</button>
       </div>
-      <!-- AI 검색 결과 영역 -->
       <div id="ai-search-results">${renderSearchResults()}</div>
     </div>
 
-    <!-- 복지에코 규칙 기반 자격 판정 패널 -->
+    <!-- ① 규칙 기반 자격 판정 (확실한 매칭) -->
     <div class="card mb16" id="rule-match-panel">
       <div class="section-header" style="margin-bottom:12px">
         <div>
-          <div class="section-title">규칙 기반 자격 판정</div>
-          <div style="font-size:.76rem;color:var(--text-muted);margin-top:2px">자격 판정은 규칙 100% — AI 환각 없음</div>
+          <div class="section-title">규칙 판정 — 받을 수 있는 혜택</div>
+          <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">
+            자격 조건을 규칙으로 판정 — LLM 환각 없음
+          </div>
         </div>
         <button class="btn btn-primary btn-sm" id="btn-fetch-api" onclick="fetchWelfareAPI()">
           실제 복지 조회
         </button>
       </div>
       <div id="rule-match-summary">
-        ${APP.profile ? renderRuleMatchSummary(matched) : '<div style="color:var(--text-muted);font-size:.84rem">프로필 입력 후 자동 판정됩니다</div>'}
+        ${APP.profile
+          ? renderRuleMatchSummary(ruleMatched)
+          : '<div style="color:var(--text-muted);font-size:.84rem">프로필 입력 후 자동 판정됩니다</div>'}
       </div>
+      ${ruleMatched.length ? `
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:8px">
+          ${ruleMatched.map(b => renderBenefitCard(b)).join('')}
+        </div>` : ''}
     </div>
 
-    <!-- 카테고리 필터 -->
-    <div class="news-filter-bar">
-      <button class="toggle-btn active" data-filter="all" onclick="filterBenefits('all',this)">전체 (${benefits.length})</button>
-      ${Object.entries(BENEFIT_CATEGORIES).map(([id, cat]) => {
-        const count = benefits.filter(b => b.category === id).length;
-        if (!count) return '';
-        return `<button class="toggle-btn" data-filter="${id}" onclick="filterBenefits('${id}',this)">${cat.icon} ${cat.label} (${count})</button>`;
-      }).join('')}
+    <!-- ② 복지 API 전체 결과 (관련성 정렬 + 페이지네이션) -->
+    <div id="api-results-section">
+      ${renderAPIResultsSection()}
     </div>
 
-    <!-- 프로필 없을 때 안내 -->
+    <!-- 프로필 없을 때 -->
     ${!APP.profile ? `
-      <div class="card card-blue" style="text-align:center;padding:32px">
+      <div class="card card-blue" style="text-align:center;padding:28px">
         <div style="font-size:1rem;font-weight:700;margin-bottom:8px">프로필 미입력</div>
-        <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">프로필을 입력하면 맞춤 혜택을 찾아드립니다</div>
+        <div style="font-size:.85rem;color:var(--text-muted);margin-bottom:16px">프로필을 입력하면 혜택을 찾아드립니다</div>
         <button class="btn btn-primary" onclick="navigateTo('profile')">프로필 입력하기</button>
       </div>` : ''}
-
-    <!-- 혜택 목록 (중앙부처 / 지자체 분리) -->
-    <div id="benefits-list">
-      ${benefits.length ? renderBenefitsBySource(benefits) :
-        APP.profile ? uiEmpty('🔍', '조건에 맞는 혜택이 없습니다', '프로필을 수정하거나 AI 분석을 시도해보세요') : ''}
-    </div>
-
-    <!-- 유사계층 분석 결과 -->
-    <div id="cohort-result" class="mt20"></div>
   `;
+}
+
+// ── 프로필 관련성 정렬 ───────────────────────────────────────────────
+function sortByRelevance(items, p) {
+  if (!p) return items;
+
+  const lifeLabel = {
+    '001':'영유아','002':'아동','003':'청소년','004':'청년',
+    '005':'중장년','006':'노년','007':'임신·출산',
+  }[ageToLifeCode(parseInt(p.age||30), p.pregnant)] || '';
+
+  return [...items].sort((a, b) => score(b, p, lifeLabel) - score(a, p, lifeLabel));
+}
+
+function score(b, p, lifeLabel) {
+  let s = 0;
+  const hay = [...(b.tags||[]), b.description||'', b.name||''].join(' ');
+
+  // 생애주기 일치 (+30)
+  if (lifeLabel && hay.includes(lifeLabel)) s += 30;
+  // 장애인 (+25)
+  if (p.disability && hay.includes('장애')) s += 25;
+  // 저소득 (+25)
+  if (parseInt(p.incomePercent||100) <= 50 && (hay.includes('저소득')||hay.includes('기초'))) s += 25;
+  // 임신·출산 (+30)
+  if (p.pregnant && (hay.includes('임신')||hay.includes('출산'))) s += 30;
+  // 한부모 (+20)
+  if (p.householdType === 'single-parent' && hay.includes('한부모')) s += 20;
+  // 자녀 있음 (+15)
+  if (p.hasChildren && (hay.includes('아동')||hay.includes('보육')||hay.includes('자녀'))) s += 15;
+  // 노인 부양 (+15)
+  if (p.elderly && (hay.includes('노인')||hay.includes('노년'))) s += 15;
+  // 실직 (+20)
+  if (p.employment === 'unemployed' && (hay.includes('취업')||hay.includes('실업')||hay.includes('일자리'))) s += 20;
+  // 온라인 신청 가능 (+5)
+  if (b.onapPsbltYn === 'Y') s += 5;
+  return s;
+}
+
+// ── API 전체 결과 섹션 렌더 (페이지네이션) ──────────────────────────
+function renderAPIResultsSection() {
+  if (!_sortedAPI.length) return '';
+
+  const shown   = _sortedAPI.slice(0, _apiPage * API_PAGE_SIZE);
+  const total   = _sortedAPI.length;
+  const hasMore = shown.length < total;
+
+  const central = shown.filter(b => b.source !== 'local');
+  const local   = shown.filter(b => b.source === 'local');
+
+  const srcSection = (label, color, items) => items.length ? `
+    <div style="display:flex;align-items:center;gap:8px;margin:8px 0 6px">
+      <span style="font-size:.71rem;font-weight:700;color:${color};white-space:nowrap">${label}</span>
+      <span style="font-size:.68rem;color:var(--text-dim)">${items.length}건</span>
+      <div style="flex:1;height:1px;background:var(--border)"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      ${items.map(b => renderBenefitCard(b)).join('')}
+    </div>` : '';
+
+  return `
+    <div style="margin-bottom:20px">
+      <!-- 섹션 헤더 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:.9rem;font-weight:700">복지 API 전체 결과</div>
+          <div style="font-size:.74rem;color:var(--text-muted);margin-top:2px">
+            프로필 관련성 높은 순 · 총 ${total}건
+          </div>
+        </div>
+        <span class="badge" style="background:var(--bg3);color:var(--text-muted)">
+          ${shown.length} / ${total}
+        </span>
+      </div>
+
+      <!-- 결과 목록 -->
+      <div id="api-results-list">
+        ${srcSection('중앙부처', 'var(--primary)', central)}
+        ${srcSection('지자체', 'var(--secondary)', local)}
+      </div>
+
+      <!-- 더보기 버튼 -->
+      ${hasMore ? `
+        <button onclick="loadMoreAPIResults()"
+          style="width:100%;margin-top:12px;padding:13px;border-radius:12px;
+                 border:1.5px solid var(--border);background:var(--bg2);
+                 color:var(--text-muted);font-size:.84rem;font-weight:600;
+                 cursor:pointer;font-family:inherit">
+          더보기 (${total - shown.length}건 남음)
+        </button>` : `
+        <div style="text-align:center;font-size:.75rem;color:var(--text-dim);margin-top:12px;padding:8px 0">
+          전체 ${total}건 모두 표시됨
+        </div>`}
+    </div>
+  `;
+}
+
+// ── 더보기 ───────────────────────────────────────────────────────────
+function loadMoreAPIResults() {
+  _apiPage++;
+  const section = document.getElementById('api-results-section');
+  if (section) section.innerHTML = renderAPIResultsSection();
 }
 
 // ── 중앙부처 / 지자체 분리 렌더 ─────────────────────────────────────
@@ -389,8 +484,8 @@ function renderRuleMatchSummary(matched) {
         <div style="font-size:.73rem;color:var(--text-muted)">온라인 신청 가능</div>
       </div>
     </div>
-    <div id="api-fetch-status" style="font-size:.76rem;color:var(--text-dim)">
-      프로필 저장 시 자동 조회됩니다 · 수동으로 다시 조회하려면 위 버튼을 누르세요
+    <div id="api-fetch-status" style="font-size:.75rem;color:var(--text-dim);margin-top:4px">
+      프로필 저장 시 자동 조회 · 수동 조회는 위 버튼 클릭
     </div>`;
 }
 
@@ -460,8 +555,10 @@ async function fetchWelfareAPI() {
 
     if (allItems.length > 0) {
       const apiItems = allItems.map(apiItemToLocal);
-      const merged   = mergeAndDedupe(matchBenefits(), apiItems);
-      saveBenefits(merged);
+      // API 결과만 저장 (로컬 규칙 매칭과 별도 관리)
+      saveBenefits(apiItems);
+      _apiPage   = 1;
+      _sortedAPI = sortByRelevance(apiItems, APP.profile);
       renderBenefitsPage();
 
       toast(`중앙 ${centralCount}건 + 지자체 ${localCount}건 로드 (전체 ${totalCount}건)`, 'success', 4000);
