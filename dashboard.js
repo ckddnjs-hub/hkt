@@ -109,7 +109,7 @@ function renderDashboard() {
             <div style="font-size:2.5rem;margin-bottom:12px">🔍</div>
             <div style="font-weight:700;margin-bottom:8px">맞춤 혜택을 찾아드릴게요</div>
             <div style="font-size:.83rem;color:var(--text-muted);margin-bottom:16px">정보 입력 후 AI 분석을 시작합니다</div>
-            <button class="btn btn-primary" onclick="${p?.onboarding_done ? 'loadStrategy()' : 'renderWizard()'}">
+            <button class="btn btn-primary" onclick="${p?.onboarding_done ? 'loadStrategy()' : 'navigateTo(\'wizard\')'}">
               ${p?.onboarding_done ? '🤖 AI 분석 시작' : '정보 입력하기'}
             </button>
           `}
