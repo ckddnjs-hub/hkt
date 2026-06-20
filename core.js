@@ -143,7 +143,7 @@ function renderProfilePage() {
         ${profileRow('영유아 자녀', p?.has_infant ? '있음' : '없음')}
         ${profileRow('기초/차상위', p?.is_low_income ? '해당' : '해당없음')}
       </div>
-      <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="renderWizard()">
+      <button class="btn btn-outline btn-full" style="margin-top:8px" onclick="navigateTo('wizard')">
         ✏️ 정보 다시 입력
       </button>
       <button class="btn btn-outline btn-full" style="margin-top:8px;color:var(--danger);border-color:var(--danger)" onclick="requestPushPermission()">

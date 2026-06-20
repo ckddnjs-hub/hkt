@@ -42,7 +42,7 @@ function renderDashboard() {
 
       ${!p?.onboarding_done ? `
         <!-- 온보딩 안내 -->
-        <div class="card" style="background:rgba(0,200,150,.08);border-color:var(--border-strong);cursor:pointer" onclick="renderWizard()">
+        <div class="card" style="background:rgba(0,200,150,.08);border-color:var(--border-strong);cursor:pointer" onclick="navigateTo('wizard')">
           <div style="display:flex;align-items:center;gap:14px">
             <div style="font-size:2rem">📝</div>
             <div style="flex:1">
