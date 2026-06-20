@@ -55,6 +55,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// ── 테마 ──────────────────────────────────────────────────────────────
+function _applyTheme(mode) {
+  const isLight = mode === 'light';
+  document.body.classList.toggle('light', isLight);
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = isLight ? '🌑' : '🌙';
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.content = isLight ? '#F4F6F8' : '#161B22';
+}
+function toggleTheme() {
+  const next = document.body.classList.contains('light') ? 'dark' : 'light';
+  localStorage.setItem('theme', next);
+  _applyTheme(next);
+}
+// 저장된 테마 즉시 적용 (깜빡임 방지)
+_applyTheme(localStorage.getItem('theme') || 'dark');
+
 // ── 라우팅 ────────────────────────────────────────────────────────────
 function navigateTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
