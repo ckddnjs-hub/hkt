@@ -22,13 +22,19 @@ function renderStrategy() {
 
     <div class="strategy-section">
 
-      ${data?.strategy_summary ? `
-        <!-- 전략 요약 -->
+      ${data?.presented_text ? `
+        <!-- AI 안내문 -->
         <div class="card" style="background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.3)">
-          <div class="chart-title">🤖 AI 전략 요약</div>
-          <div style="font-size:.85rem;color:var(--text);line-height:1.7">${esc(data.strategy_summary).replace(/\n/g,'<br>')}</div>
+          <div class="chart-title">🤖 AI 맞춤 혜택 안내</div>
+          <div style="font-size:.85rem;color:var(--text);line-height:1.8">
+            ${esc(data.presented_text)
+              .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+              .replace(/\n/g, '<br>')
+              .replace(/^#{1,3} (.*)/gm, '<div style="font-weight:900;margin:8px 0 4px">$1</div>')
+              .replace(/^\* /gm, '• ')}
+          </div>
           ${data.urgent_actions?.length ? `
-            <div style="margin-top:12px">
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
               <div style="font-size:.75rem;font-weight:700;color:var(--warn);margin-bottom:6px">⚡ 지금 당장 해야 할 일</div>
               ${data.urgent_actions.map((a, i) => `
                 <div style="display:flex;gap:8px;margin-bottom:6px;font-size:.83rem">
@@ -36,6 +42,10 @@ function renderStrategy() {
                   <span>${esc(a)}</span>
                 </div>`).join('')}
             </div>` : ''}
+        </div>` : data?.loading ? `
+        <div class="card" style="text-align:center;padding:24px">
+          <div class="spinner" style="margin:0 auto 12px"></div>
+          <div style="font-size:.85rem;color:var(--text-muted)">복지 DB 검색 중...</div>
         </div>` : ''}
 
       <!-- 긴급도 × 효과 산점도 -->

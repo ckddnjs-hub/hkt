@@ -84,41 +84,51 @@ async function _chatDoSend(msg) {
   el.scrollTop = el.scrollHeight;
 
   try {
-    const res = await fetch(`${RAILWAY_URL}/api/chat`, {
+    // 전략 검색 이후엔 /api/personal/feedback, 아니면 /api/personal/search 신규 호출
+    const hasSearched = !!(_dashStrategyCache?.benefits?.length);
+    const endpoint    = hasSearched ? '/api/personal/feedback' : '/api/personal/search';
+
+    if (!_searchThreadId) {
+      _searchThreadId = (ME?.id || 'anon') + '-' + Date.now();
+    }
+
+    const body = hasSearched
+      ? { thread_id: _searchThreadId, message: msg }
+      : {
+          thread_id:    _searchThreadId,
+          user_profile: typeof _buildUserProfile === 'function' ? _buildUserProfile(MY_PROFILE || {}) : {},
+          message:      msg,
+        };
+
+    const res = await fetch(`${RAILWAY_URL}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userId: ME?.id,
-        profile: MY_PROFILE,
-        message: msg,
-        history: _chatHistory.slice(-10),
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) throw new Error(res.status);
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let aiText = '';
-    const typingEl = document.getElementById(typingId);
+    const data = await res.json();
+    // feedback 응답: { reply } 또는 { presented_text } 또는 search 결과
+    const aiText = data.reply || data.presented_text || data.message ||
+      (data.results ? `검색 결과 ${data.results.length}건을 찾았어요.` : '응답을 받았어요.');
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value);
-      const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
-      for (const line of lines) {
-        const data = JSON.parse(line.slice(6));
-        if (data.text) {
-          aiText += data.text;
-          if (typingEl) typingEl.innerHTML = _chatFormatAI(aiText);
-          el.scrollTop = el.scrollHeight;
-        }
-        if (data.done) break;
+    const typingEl = document.getElementById(typingId);
+    if (typingEl) typingEl.innerHTML = _chatFormatAI(aiText);
+    _chatHistory.push({ role: 'ai', content: aiText });
+
+    // 검색 결과가 있으면 전략 캐시 갱신
+    if (data.results) {
+      if (typeof _mapResults === 'function') {
+        const benefits = _mapResults(data.results);
+        _dashStrategyCache = {
+          ..._dashStrategyCache,
+          benefits,
+          presented_text: data.presented_text || '',
+          strategy_summary: data.presented_text || '',
+        };
       }
     }
-
-    _chatHistory.push({ role: 'ai', content: aiText });
 
   } catch (e) {
     const typingEl = document.getElementById(typingId);
