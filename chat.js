@@ -5,6 +5,8 @@
 
 let _chatHistory = [];
 let _chatStreaming = false;
+let _chatSearchDone = false;   // 채팅에서 search를 한 번 했는지
+let _chatThreadId = null;      // 채팅 전용 thread_id (대시보드와 분리)
 
 function renderChat() {
   const el = document.getElementById('chat-messages');
@@ -84,22 +86,22 @@ async function _chatDoSend(msg) {
   el.scrollTop = el.scrollHeight;
 
   try {
-    // 전략 검색 이후엔 /api/personal/feedback, 아니면 /api/personal/search 신규 호출
-    const hasSearched = !!(_dashStrategyCache?.benefits?.length);
-    const endpoint    = hasSearched ? '/api/personal/feedback' : '/api/personal/search';
-
-    if (!_searchThreadId) {
-      _searchThreadId = (ME?.id || 'anon') + '-' + Date.now();
+    // 채팅 전용 thread_id 초기화
+    if (!_chatThreadId) {
+      _chatThreadId = (ME?.id || 'anon') + '-chat-' + Date.now();
     }
 
-    // PersonalFeedbackRequest: { thread_id, feedback }
-    // PersonalSearchRequest:   { thread_id, user_profile, message }
-    const body = hasSearched
-      ? { thread_id: _searchThreadId, feedback: msg }
+    // 첫 메시지 → search / 이후 → feedback
+    const endpoint = _chatSearchDone ? '/api/personal/feedback' : '/api/personal/search';
+
+    const body = _chatSearchDone
+      ? { thread_id: _chatThreadId, feedback: msg }
       : {
-          thread_id:    _searchThreadId,
-          user_profile: typeof _buildUserProfile === 'function' ? _buildUserProfile(MY_PROFILE || {}) : {},
-          message:      msg,
+          thread_id:    _chatThreadId,
+          user_profile: typeof _buildUserProfile === 'function'
+            ? _buildUserProfile(MY_PROFILE || {})
+            : { age: 40 },
+          message: msg,
         };
 
     const res = await fetch(`${RAILWAY_URL}${endpoint}`, {
@@ -111,27 +113,18 @@ async function _chatDoSend(msg) {
     if (!res.ok) throw new Error(res.status);
 
     const data = await res.json();
-    // feedback 응답: { response_text, satisfaction, summary, email_sent }
+
     // search  응답: { presented_text, results, raw_count }
-    const aiText = data.response_text || data.presented_text ||
+    // feedback 응답: { response_text, satisfaction, summary, email_sent }
+    const aiText = data.presented_text || data.response_text ||
       (data.results ? `검색 결과 ${data.results.length}건을 찾았어요.` : '응답을 받았어요.');
 
     const typingEl = document.getElementById(typingId);
     if (typingEl) typingEl.innerHTML = _chatFormatAI(aiText);
     _chatHistory.push({ role: 'ai', content: aiText });
 
-    // 검색 결과가 있으면 전략 캐시 갱신
-    if (data.results) {
-      if (typeof _mapResults === 'function') {
-        const benefits = _mapResults(data.results);
-        _dashStrategyCache = {
-          ..._dashStrategyCache,
-          benefits,
-          presented_text: data.presented_text || '',
-          strategy_summary: data.presented_text || '',
-        };
-      }
-    }
+    // 첫 search 완료 → 이후 메시지는 feedback으로
+    _chatSearchDone = true;
 
   } catch (e) {
     const typingEl = document.getElementById(typingId);
