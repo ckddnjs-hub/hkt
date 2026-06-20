@@ -10,7 +10,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css?v=7">
+  <link rel="stylesheet" href="app.css?v=8">
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <!-- Chart.js -->
@@ -64,17 +64,8 @@
       <!-- strategy.js가 렌더 -->
     </div>
 
-    <!-- ④ AI 채팅 -->
-    <div class="page" id="page-chat">
-      <div class="chat-messages" id="chat-messages"></div>
-      <div style="height:120px"></div>
-      <div class="chat-input-bar">
-        <textarea id="chat-input" class="chat-input" rows="1"
-          placeholder="예: 출산 후 받을 수 있는 혜택 알려줘"
-          onkeydown="chatOnKeydown(event)"></textarea>
-        <button class="chat-send-btn" onclick="chatSend()">↑</button>
-      </div>
-    </div>
+    <!-- ④ AI 채팅 (chat.js가 통째로 렌더) -->
+    <div class="page" id="page-chat"></div>
 
     <!-- ⑤ AI 캘린더 -->
     <div class="page" id="page-calendar">
@@ -110,11 +101,11 @@
 
 </div>
 
-<script src="core.js?v=7"></script>
-<script src="wizard.js?v=7"></script>
-<script src="dashboard.js?v=7"></script>
-<script src="chat.js?v=7"></script>
-<script src="strategy.js?v=7"></script>
-<script src="calendar.js?v=7"></script>
+<script src="core.js?v=8"></script>
+<script src="wizard.js?v=8"></script>
+<script src="dashboard.js?v=8"></script>
+<script src="chat.js?v=8"></script>
+<script src="strategy.js?v=8"></script>
+<script src="calendar.js?v=8"></script>
 </body>
 </html>

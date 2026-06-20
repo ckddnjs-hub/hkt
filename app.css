@@ -149,8 +149,13 @@ body.light .hero-stat{background:rgba(0,0,0,.04)}
 .benefit-amount{font-size:.8rem;color:var(--primary);font-weight:700}
 .benefit-how{font-size:.72rem;color:var(--text-muted);margin-top:1px}
 
+/* ══ 채팅 탭 ═══════════════════════════════════════════════════════════ */
+.chat-tab-bar{display:flex;border-bottom:1px solid var(--border);background:var(--bg2);position:sticky;top:0;z-index:10;transition:background .25s}
+.chat-tab-btn{flex:1;padding:12px 8px;border:none;background:transparent;color:var(--text-muted);font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+.chat-tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+
 /* ══ 채팅 ══════════════════════════════════════════════════════════════ */
-.chat-messages{padding:16px;display:flex;flex-direction:column;gap:12px;min-height:calc(100vh - 180px)}
+.chat-messages{padding:16px;display:flex;flex-direction:column;gap:12px;min-height:calc(100vh - 200px)}
 .chat-bubble{max-width:85%;padding:12px 14px;border-radius:16px;font-size:.88rem;line-height:1.6;animation:fadeIn .2s ease}
 .chat-bubble.user{align-self:flex-end;background:var(--primary);color:#000;border-bottom-right-radius:4px}
 .chat-bubble.ai{align-self:flex-start;background:var(--surface);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
