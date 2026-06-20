@@ -129,14 +129,26 @@ function _renderGovMessages(el) {
 }
 
 // ── 공통 포맷 ─────────────────────────────────────────────────────────
-function _chatFormatAI(text) {
-  return text
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">$1</a>')
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
-    .replace(/^(\d+️⃣|[1-9]\.|[1-9]️⃣)\s*/gm, '<div style="margin-top:10px;font-weight:700;color:var(--primary)">$1 </div>')
-    .replace(/\n/g, '<br>')
-    .replace(/^#{1,3} (.*)/gm, '<div style="font-weight:900;margin:8px 0 2px">$1</div>')
-    .replace(/^- (.*)/gm, '<div style="padding-left:10px">• $1</div>');
+function _chatFormatAI(raw) {
+  // 마크다운 링크 → <a>
+  let t = raw.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+    '<a href="$2" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600;text-decoration:underline">$1 ↗</a>');
+
+  // **bold**
+  t = t.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+
+  // 혜택 번호 줄 (1️⃣ 등) → 카드 구분선
+  t = t.replace(/^([1-5]️⃣)\s*(.+)$/gm,
+    '<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);font-weight:800;font-size:.95rem">$1 $2</div>');
+
+  // 항목 줄 (📋 💰 🏢 📞 🔗)
+  t = t.replace(/^(📋|💰|🏢|📞|🔗)\s*(.+)$/gm,
+    '<div style="display:flex;gap:6px;margin:3px 0;font-size:.83rem"><span style="flex-shrink:0">$1</span><span>$2</span></div>');
+
+  // 나머지 줄바꿈
+  t = t.replace(/\n/g, '<br>');
+
+  return t;
 }
 
 // ── 전송 라우터 ──────────────────────────────────────────────────────

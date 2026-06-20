@@ -133,35 +133,52 @@ function buildProfile(age, p) {
 async function askGPT(message, profileSummary, services, history, key, isFollowUp) {
   const serviceText = services.length
     ? services.slice(0, 40).map((s, i) => {
-        const name    = s['서비스명'] || '';
-        const content = (s['지원내용'] || '').slice(0, 150);
-        const method  = (s['신청방법'] || '').slice(0, 80);
-        const url     = s['상세조회URL'] || '';
-        const agency  = s['소관기관명'] || '';
-        const field   = s['서비스분야'] || '';
-        return `[${i+1}] ${name} (${agency} | ${field})\n지원: ${content}\n신청: ${method}${url ? `\nURL: ${url}` : ''}`;
+        const name       = s['서비스명']    || '';
+        const agency     = s['소관기관명']  || '';
+        const field      = s['서비스분야']  || '';
+        const target     = s['지원대상']    || '';
+        const criteria   = s['선정기준']    || '';
+        const content    = s['지원내용']    || '';
+        const method     = s['신청방법']    || '';
+        const dept       = s['부서명']      || '';
+        const phone      = s['전화문의']    || '';
+        const url        = s['상세조회URL'] || '';
+        return [
+          `[${i+1}] ${name} (${agency} | ${field})`,
+          `신청자격: ${(criteria || target).slice(0, 200)}`,
+          `혜택내용: ${content.slice(0, 200)}`,
+          `담당부서: ${dept}`,
+          `전화번호: ${phone}`,
+          `신청방법: ${method.slice(0, 100)}`,
+          url ? `URL: ${url}` : '',
+        ].filter(Boolean).join('\n');
       }).join('\n\n')
     : '(검색 결과 없음)';
 
   const systemPrompt = `당신은 한국 복지 혜택 전문 AI 상담사입니다.
 행정안전부 gov24 공공 복지서비스 데이터와 사용자 프로필을 바탕으로 맞춤 혜택을 안내합니다.
 
-[답변 형식 - 반드시 준수]
-첫 질문이라면:
+[필수 출력 형식 - 첫 질문 및 서비스 추천 시 반드시 준수]
+각 혜택마다 아래 6개 항목을 반드시 모두 포함하세요. 데이터가 없으면 "확인 필요"로 표기하세요.
+
 1️⃣ **혜택명** (소관기관)
-   - 지원내용: (1~2줄)
-   - 신청방법: (간략히)
-   - 🔗 [신청하기](URL)
+📋 신청자격: (선정기준 또는 지원대상 — 구체적으로)
+💰 혜택내용: (지원내용 — 금액이나 현물 내용 포함)
+🏢 담당부서: (부서명)
+📞 전화번호: (전화문의)
+🔗 [상세정보 보러가기](URL)
 
-위 형식으로 우선순위 상위 5개를 번호 순으로 나열하세요.
-마지막에 한 줄 요약: "총 N개 혜택 중 가장 적합한 5개를 선별했어요 😊"
+위 형식으로 우선순위 상위 5개를 1️⃣~5️⃣ 순으로 나열하세요.
+마지막 줄: "총 N개 혜택 중 프로필에 가장 적합한 5개를 선별했어요 😊"
 
-후속 질문이라면: 이전 대화 맥락을 반영해 자연스럽게 답변하세요.
+[후속 질문 처리]
+이전 대화 맥락을 참고해 자연스럽게 답변하되,
+특정 혜택에 대한 질문이면 해당 혜택의 6개 항목을 다시 상세히 안내하세요.
 
 [공통 규칙]
 - 사용자 프로필(나이·소득·가구형태)에 맞지 않는 서비스는 제외
 - 한국어, 친절한 대화체
-- URL이 있으면 반드시 포함`;
+- URL이 없으면 https://www.bokjiro.go.kr 을 대체 링크로 사용`;
 
   // 이전 대화를 GPT messages에 추가 (최대 최근 8턴)
   const historyMessages = history.slice(-8).map(h => ({
@@ -191,8 +208,8 @@ async function askGPT(message, profileSummary, services, history, key, isFollowU
     body: JSON.stringify({
       model: 'gpt-4o',
       messages,
-      max_tokens: 1200,
-      temperature: 0.5,
+      max_tokens: 2000,
+      temperature: 0.4,
     }),
     signal: AbortSignal.timeout(30000),
   });
