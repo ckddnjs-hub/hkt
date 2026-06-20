@@ -144,7 +144,7 @@ function _drawScatterChart(benefits) {
     x: b.urgency,
     y: b.impact,
     label: b.name,
-    color: b.urgency >= 8 ? '#FF5252' : b.urgency >= 5 ? '#FF9800' : '#00C896',
+    color: b.urgency >= 8 ? '#ff3b30' : b.urgency >= 5 ? '#ff9f0a' : '#34c759',
   }));
 
   _scatterChart = new Chart(canvas, {
@@ -171,15 +171,15 @@ function _drawScatterChart(benefits) {
       scales: {
         x: {
           min: 0, max: 10,
-          title: { display: true, text: '긴급도 →', color: '#A0AEBB', font: { size: 11 } },
-          ticks: { color: '#6B7685', stepSize: 2 },
-          grid: { color: 'rgba(255,255,255,.05)' },
+          title: { display: true, text: '긴급도 →', color: '#86868b', font: { size: 11 } },
+          ticks: { color: '#86868b', stepSize: 2 },
+          grid: { color: 'rgba(0,0,0,.05)' },
         },
         y: {
           min: 0, max: 10,
-          title: { display: true, text: '효과 →', color: '#A0AEBB', font: { size: 11 } },
-          ticks: { color: '#6B7685', stepSize: 2 },
-          grid: { color: 'rgba(255,255,255,.05)' },
+          title: { display: true, text: '효과 →', color: '#86868b', font: { size: 11 } },
+          ticks: { color: '#86868b', stepSize: 2 },
+          grid: { color: 'rgba(0,0,0,.05)' },
         },
       },
     },
@@ -210,10 +210,10 @@ function _drawRadarChart(scores) {
       datasets: [{
         label: '커버리지',
         data: values,
-        backgroundColor: 'rgba(0,200,150,.2)',
-        borderColor: '#00C896',
+        backgroundColor: 'rgba(0,102,204,.12)',
+        borderColor: '#0066cc',
         borderWidth: 2,
-        pointBackgroundColor: '#00C896',
+        pointBackgroundColor: '#0066cc',
         pointRadius: 4,
       }],
     },
@@ -224,9 +224,9 @@ function _drawRadarChart(scores) {
         r: {
           min: 0, max: 100,
           ticks: { display: false, stepSize: 25 },
-          grid: { color: 'rgba(255,255,255,.08)' },
-          angleLines: { color: 'rgba(255,255,255,.08)' },
-          pointLabels: { color: '#A0AEBB', font: { size: 11, weight: '700' } },
+          grid: { color: 'rgba(0,0,0,.06)' },
+          angleLines: { color: 'rgba(0,0,0,.06)' },
+          pointLabels: { color: '#6e6e73', font: { size: 11, weight: '600' } },
         },
       },
     },
