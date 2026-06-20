@@ -21,7 +21,6 @@ let _wz = {
 const WZ_TOTAL = 8;
 
 function renderWizard() {
-  navigateTo('wizard');
   _wz.step = 0;
   _wzRenderStep();
 }
