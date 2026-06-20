@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#00C896">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>복지혜택 AI</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app.css">
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- 로딩 화면 -->
+<div id="loading-screen">
+  <div class="ld-icon">🏛️</div>
+  <div class="ld-title">복지혜택 AI</div>
+  <div class="ld-sub">AI가 맞춤 혜택 전략을 짜드립니다</div>
+  <div class="spinner" style="margin-top:8px"></div>
+</div>
+
+<!-- 앱 -->
+<div id="app">
+
+  <!-- 상단 헤더 -->
+  <header class="app-header">
+    <div class="app-header-logo" onclick="navigateTo('dashboard')">
+      🏛️ 복지혜택 AI
+    </div>
+    <div class="header-right">
+      <div id="hdr-badge" style="display:none" class="badge badge-green">분석완료</div>
+      <div class="header-avatar" onclick="navigateTo('profile')" id="hdr-avatar">👤</div>
+    </div>
+  </header>
+
+  <!-- 페이지 영역 -->
+  <div class="app-body" id="app-body">
+
+    <!-- ① 위저드 (온보딩) -->
+    <div class="page" id="page-wizard">
+      <div class="wizard-progress-bar">
+        <div class="wizard-progress-fill" id="wizard-progress" style="width:0%"></div>
+      </div>
+      <div class="wizard-wrap" id="wizard-wrap">
+        <!-- wizard.js가 동적으로 렌더 -->
+      </div>
+    </div>
+
+    <!-- ② 대시보드 (홈) -->
+    <div class="page" id="page-dashboard">
+      <!-- dashboard.js가 렌더 -->
+    </div>
+
+    <!-- ③ 전략보드 -->
+    <div class="page" id="page-strategy">
+      <!-- strategy.js가 렌더 -->
+    </div>
+
+    <!-- ④ AI 채팅 -->
+    <div class="page" id="page-chat">
+      <div class="chat-messages" id="chat-messages"></div>
+      <div style="height:120px"></div>
+      <div class="chat-input-bar">
+        <textarea id="chat-input" class="chat-input" rows="1"
+          placeholder="예: 출산 후 받을 수 있는 혜택 알려줘"
+          onkeydown="chatOnKeydown(event)"></textarea>
+        <button class="chat-send-btn" onclick="chatSend()">↑</button>
+      </div>
+    </div>
+
+    <!-- ⑤ AI 캘린더 -->
+    <div class="page" id="page-calendar">
+      <!-- calendar.js가 렌더 -->
+    </div>
+
+    <!-- ⑥ 내정보 -->
+    <div class="page" id="page-profile">
+      <!-- profile section rendered by core.js -->
+    </div>
+
+  </div>
+
+  <!-- 하단 내비게이션 -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bottom-nav-item" id="nav-dashboard" onclick="navigateTo('dashboard')">
+      <span class="nav-icon">🏠</span>홈
+    </button>
+    <button class="bottom-nav-item" id="nav-strategy" onclick="navigateTo('strategy')">
+      <span class="nav-icon">📊</span>전략보드
+    </button>
+    <button class="bottom-nav-item nav-fab" id="nav-chat" onclick="navigateTo('chat')">
+      <div class="nav-fab-circle">💬</div>
+      <span>AI상담</span>
+    </button>
+    <button class="bottom-nav-item" id="nav-calendar" onclick="navigateTo('calendar')">
+      <span class="nav-icon">📅</span>캘린더
+    </button>
+    <button class="bottom-nav-item" id="nav-profile" onclick="navigateTo('profile')">
+      <span class="nav-icon">👤</span>내정보
+    </button>
+  </nav>
+
+</div>
+
+<script src="core.js"></script>
+<script src="wizard.js"></script>
+<script src="dashboard.js"></script>
+<script src="chat.js"></script>
+<script src="strategy.js"></script>
+<script src="calendar.js"></script>
+</body>
+</html>
