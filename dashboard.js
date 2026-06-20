@@ -24,15 +24,15 @@ function renderDashboard() {
       <div class="hero-title">${esc(name)}님을 위한<br>맞춤 혜택이 있어요</div>
       <div class="hero-stat-row">
         <div class="hero-stat">
-          <div class="hero-stat-num" style="color:var(--primary)">${benefits.length || '?'}</div>
+          <div class="hero-stat-num" style="color:var(--primary)">${_dashStrategyCache?.loading ? '…' : (benefits.length || '0')}</div>
           <div class="hero-stat-label">수급 가능 혜택</div>
         </div>
         <div class="hero-stat">
-          <div class="hero-stat-num" style="color:var(--warn)">${urgent.length || '?'}</div>
+          <div class="hero-stat-num" style="color:var(--warn)">${_dashStrategyCache?.loading ? '…' : (urgent.length || '0')}</div>
           <div class="hero-stat-label">긴급 신청 필요</div>
         </div>
         <div class="hero-stat">
-          <div class="hero-stat-num" style="color:var(--accent)">${_dashTotalMonthly(benefits)}</div>
+          <div class="hero-stat-num" style="color:var(--accent)">${_dashStrategyCache?.loading ? '…' : _dashTotalMonthly(benefits)}</div>
           <div class="hero-stat-label">월 예상 혜택</div>
         </div>
       </div>
@@ -83,11 +83,13 @@ function renderDashboard() {
                 <div class="benefit-name">${esc(b.name)}</div>
                 <div class="benefit-amount">${esc(b.amount)}</div>
                 <div class="benefit-how">${esc(b.description)}</div>
+                ${b.match_reason ? `<div style="font-size:.7rem;color:var(--accent);margin-top:3px">✓ ${esc(b.match_reason)}</div>` : ''}
               </div>
-              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
-                <div class="badge ${b.urgency >= 8 ? 'badge-red' : b.urgency >= 5 ? 'badge-yellow' : 'badge-green'}" style="font-size:.65rem">
-                  긴급도 ${b.urgency}
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+                <div class="badge ${b.source === '지자체' ? 'badge-purple' : 'badge-green'}" style="font-size:.6rem">
+                  ${b.source === '지자체' ? '지자체' : '행정안전부'}
                 </div>
+                <button style="font-size:.7rem;padding:4px 9px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;white-space:nowrap" onclick="window.open('${esc(b.apply_url || 'https://www.bokjiro.go.kr')}','_blank')">신청 →</button>
               </div>
             </div>`).join('')}
         </div>
@@ -128,8 +130,8 @@ function renderDashboard() {
     </div>
   `;
 
-  // 전략 데이터 없으면 자동 로드
-  if (!_dashStrategyCache && p?.onboarding_done) loadStrategy();
+  // 전략 데이터 없으면 Supabase 직접 조회로 자동 로드
+  if (!_dashStrategyCache && p?.onboarding_done) loadFromSupabase();
 }
 
 function _dashTotalMonthly(benefits) {
@@ -147,6 +149,151 @@ function _dashCatColor(cat) {
   return { '주거지원':'#3B82F6', '생활지원':'#00C896', '돌봄지원':'#EC4899', '교육지원':'#F59E0B', '자산형성':'#6366F1', '의료지원':'#EF4444' }[cat] || '#6B7685';
 }
 
+// ── 소득구간 판별 ─────────────────────────────────────────────────────
+const INCOME_BANDS = [
+  ['income_band_50',      1_196_000],
+  ['income_band_75',      1_794_000],
+  ['income_band_100',     2_392_000],
+  ['income_band_200',     4_784_000],
+  ['income_band_over200', Infinity],
+];
+
+// ── 카테고리 분류 ─────────────────────────────────────────────────────
+function _fieldToCategory(field = '', name = '') {
+  const t = (field + name).toLowerCase();
+  if (/주거|임대|전세|월세/.test(t))              return '주거지원';
+  if (/의료|건강|보건|병원|치료|약/.test(t))       return '의료지원';
+  if (/돌봄|요양|장기|보호|아동|영유아/.test(t))   return '돌봄지원';
+  if (/교육|학습|학비|장학|학교/.test(t))          return '교육지원';
+  if (/취업|고용|일자리|창업|자립|자산/.test(t))   return '자산형성';
+  return '생활지원';
+}
+
+// ── Supabase 직접 쿼리 → 홈 혜택 추천 ───────────────────────────────
+async function loadFromSupabase() {
+  if (!MY_PROFILE?.onboarding_done) return;
+
+  _dashStrategyCache = { loading: true };
+  if (currentPage === 'dashboard') renderDashboard();
+
+  const p    = MY_PROFILE;
+  const age  = p.birth_year ? new Date().getFullYear() - p.birth_year : 40;
+  const regionFull   = [p.region, p.district].filter(Boolean).join(' ');
+  const sido         = regionFull.split(' ')[0] || '';
+  const sigungu      = regionFull.split(' ')[1] || '';
+  const monthlyIncome = p.income_amount ? p.income_amount * 10000 : null;
+  const isDisabled    = !!p.has_disability;
+  const isSingle      = p.household_type === 'single';
+  const isSingleParent = p.household_type === 'single_parent' || !!p.is_single_parent;
+  const isMale        = p.gender === 'male';
+
+  try {
+    // ① 서비스 목록: 행정안전부(전국) + 해당 지자체
+    let q = sb
+      .from('welfare_services')
+      .select('service_id,service_name,agency_name,support_content,apply_method,detail_url,user_type,service_field,source,region_sido,region_sigungu,target_description')
+      .limit(300);
+
+    if (sido) {
+      q = q.or(`region_sido.is.null,region_sido.eq.${sido}`);
+    }
+
+    const { data: services, error: svcErr } = await q;
+    if (svcErr) throw svcErr;
+
+    // ② 해당 service_id의 자격 조건 일괄 조회
+    const ids = (services || []).map(s => s.service_id).filter(Boolean);
+    const { data: conditions } = await sb
+      .from('welfare_support_conditions')
+      .select('*')
+      .in('service_id', ids);
+
+    const condMap = {};
+    (conditions || []).forEach(c => { condMap[c.service_id] = c; });
+
+    // ③ 자격 매칭 (행정안전부 = 조건 규칙, 지자체 = 조건 없으면 통과)
+    const eligible = [];
+    for (const svc of (services || [])) {
+      const cond = condMap[svc.service_id];
+
+      // 조건 데이터 없는 서비스 → 지자체 서비스거나 조건 미입력 → 일단 포함
+      if (!cond) {
+        eligible.push({ ...svc, match_reason: '지역 혜택 (직접 확인 필요)' });
+        continue;
+      }
+
+      // 연령
+      if (cond.age_start && age < cond.age_start) continue;
+      if (cond.age_end   && age > cond.age_end)   continue;
+
+      // 성별
+      if (isMale  && cond.male_eligible   === false) continue;
+      if (!isMale && cond.female_eligible === false) continue;
+
+      // 소득 구간 (어떤 구간이든 설정된 경우에만 체크)
+      const hasIncomeCond = INCOME_BANDS.some(([col]) => cond[col]);
+      if (hasIncomeCond && monthlyIncome !== null) {
+        const ok = INCOME_BANDS.some(([col, limit]) => cond[col] && monthlyIncome <= limit);
+        if (!ok) continue;
+      }
+
+      // 특수 조건 (해당 특성이 필요한데 사용자가 해당 안 되면 제외)
+      if (cond.disabled       && !isDisabled)   continue;
+      if (cond.single_parent  && !isSingleParent) continue;
+      if (cond.single_household && !isSingle)   continue;
+
+      const reasons = [];
+      if (cond.age_start || cond.age_end) reasons.push(`${cond.age_start||''}~${cond.age_end||''}세`);
+      if (isDisabled && cond.disabled)    reasons.push('장애인');
+      if (isSingleParent && cond.single_parent) reasons.push('한부모');
+      if (isSingle && cond.single_household)    reasons.push('1인가구');
+
+      eligible.push({ ...svc, match_reason: reasons.join(' · ') || '자격 매칭' });
+    }
+
+    // ④ 지역 정렬: 시군구 정확 매칭 → 시도 매칭 → 전국 순
+    eligible.sort((a, b) => {
+      const rankA = a.region_sigungu === sigungu ? 0 : (a.region_sido === sido ? 1 : 2);
+      const rankB = b.region_sigungu === sigungu ? 0 : (b.region_sido === sido ? 1 : 2);
+      return rankA - rankB;
+    });
+
+    // ⑤ 캐시 저장
+    const benefits = eligible.map((s, i) => ({
+      name:         s.service_name || '알 수 없음',
+      category:     _fieldToCategory(s.service_field, s.service_name),
+      description:  (s.support_content || '').replace(/\r\n|\r|\n/g, ' ').slice(0, 80),
+      amount:       _extractAmount(s.support_content),
+      urgency:      Math.max(1, Math.min(9, 9 - Math.floor(i / 5))),
+      impact:       7,
+      deadline:     null,
+      how_to_apply: s.apply_method || '',
+      apply_url:    s.detail_url || 'https://www.bokjiro.go.kr',
+      source:       s.source || '',
+      agency:       s.agency_name || '',
+      match_reason: s.match_reason || '',
+    }));
+
+    _dashStrategyCache = {
+      benefits,
+      presented_text: '',
+      raw_count:      services.length,
+      eligible_count: eligible.length,
+      radar_scores:   _buildRadarScores(benefits),
+      navigation_path: _buildNavPath(benefits),
+      urgent_actions: [],
+    };
+
+    if (currentPage === 'dashboard') renderDashboard();
+    if (currentPage === 'strategy')  renderStrategy();
+
+  } catch (e) {
+    console.error('Supabase query error', e);
+    _dashStrategyCache = { error: e.message };
+    if (currentPage === 'dashboard') renderDashboard();
+  }
+}
+
 // ── MY_PROFILE → Railway UserProfile 변환 ────────────────────────────
 function _buildUserProfile(p) {
   const age = p.birth_year ? new Date().getFullYear() - p.birth_year : 40;
@@ -161,21 +308,11 @@ function _buildUserProfile(p) {
   };
 }
 
-// ── 결과 → 내부 캐시 포맷 변환 ──────────────────────────────────────
-function _mapResults(results, presentedText) {
-  const fieldToCategory = (f = '', n = '') => {
-    const t = (f + n).toLowerCase();
-    if (/주거|임대|전세|월세/.test(t)) return '주거지원';
-    if (/의료|건강|보건|병원|치료|약/.test(t)) return '의료지원';
-    if (/돌봄|요양|장기|보호|어린이|아동|영유아/.test(t)) return '돌봄지원';
-    if (/교육|학습|학비|장학|학교/.test(t)) return '교육지원';
-    if (/자산|취업|고용|일자리|창업|자립/.test(t)) return '자산형성';
-    return '생활지원';
-  };
-
+// ── Railway 결과 → 내부 캐시 포맷 변환 ─────────────────────────────
+function _mapResults(results) {
   return results.map((r, i) => ({
     name:        r.service_name  || '알 수 없음',
-    category:    fieldToCategory(r.service_field, r.service_name),
+    category:    _fieldToCategory(r.service_field, r.service_name),
     description: (r.support_content || '').slice(0, 80),
     amount:      _extractAmount(r.support_content),
     urgency:     Math.max(1, 8 - i),   // 앞 순서일수록 긴급도 높게
@@ -272,6 +409,7 @@ function _buildNavPath(benefits) {
 
 // 위저드 완료 후 자동 로드 트리거
 function _strategyAutoLoad() {
-  _searchThreadId = null; // 새 프로필이면 스레드 초기화
-  setTimeout(() => loadStrategy(), 500);
+  _searchThreadId = null;
+  _dashStrategyCache = null;
+  setTimeout(() => loadFromSupabase(), 500);
 }
