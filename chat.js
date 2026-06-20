@@ -92,8 +92,10 @@ async function _chatDoSend(msg) {
       _searchThreadId = (ME?.id || 'anon') + '-' + Date.now();
     }
 
+    // PersonalFeedbackRequest: { thread_id, feedback }
+    // PersonalSearchRequest:   { thread_id, user_profile, message }
     const body = hasSearched
-      ? { thread_id: _searchThreadId, message: msg }
+      ? { thread_id: _searchThreadId, feedback: msg }
       : {
           thread_id:    _searchThreadId,
           user_profile: typeof _buildUserProfile === 'function' ? _buildUserProfile(MY_PROFILE || {}) : {},
@@ -109,8 +111,9 @@ async function _chatDoSend(msg) {
     if (!res.ok) throw new Error(res.status);
 
     const data = await res.json();
-    // feedback 응답: { reply } 또는 { presented_text } 또는 search 결과
-    const aiText = data.reply || data.presented_text || data.message ||
+    // feedback 응답: { response_text, satisfaction, summary, email_sent }
+    // search  응답: { presented_text, results, raw_count }
+    const aiText = data.response_text || data.presented_text ||
       (data.results ? `검색 결과 ${data.results.length}건을 찾았어요.` : '응답을 받았어요.');
 
     const typingEl = document.getElementById(typingId);
