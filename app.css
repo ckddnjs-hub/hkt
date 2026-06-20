@@ -63,13 +63,15 @@ body.ready{visibility:visible}
 
 .app-body{flex:1;overflow-y:auto;padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
 .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:200;background:var(--bg2);border-top:1px solid var(--border);display:flex;min-height:64px;padding-bottom:env(safe-area-inset-bottom,0px);align-items:center;transition:background .25s,border-color .25s}
-.bottom-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px;cursor:pointer;border:none;background:none;color:var(--text-dim);font-family:inherit;font-size:.65rem;font-weight:700;gap:3px;transition:color .2s}
-.bottom-nav-item .nav-icon{font-size:1.3rem;opacity:.4;transition:opacity .2s,transform .2s}
+.bottom-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 2px;cursor:pointer;border:none;background:none;color:var(--text-dim);font-family:inherit;font-size:.62rem;font-weight:600;gap:4px;transition:color .2s}
+.bottom-nav-item svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:stroke .2s,transform .2s}
 .bottom-nav-item.active{color:var(--primary)}
-.bottom-nav-item.active .nav-icon{opacity:1;transform:translateY(-2px)}
-.nav-fab{position:relative;top:-6px}
-.nav-fab-circle{width:52px;height:52px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1.5rem;box-shadow:0 4px 16px rgba(0,200,150,.45);transition:transform .2s}
-.nav-fab.active .nav-fab-circle{transform:scale(1.08)}
+.bottom-nav-item.active svg{transform:translateY(-1px)}
+/* FAB 중앙 버튼 */
+.nav-fab{position:relative;top:-8px}
+.nav-fab-circle{width:54px;height:54px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;box-shadow:0 4px 18px rgba(0,200,150,.5);transition:transform .2s}
+.nav-fab-circle svg{width:26px;height:26px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nav-fab.active .nav-fab-circle{transform:scale(1.1)}
 
 /* ── 페이지 ── */
 .page{display:none;animation:fadeIn .25s ease}
