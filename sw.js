@@ -1,6 +1,9 @@
-const CACHE = 'welfare-ai-v3';
-const ASSETS = ['/', '/index.html', '/app.css', '/core.js', '/wizard.js',
-  '/dashboard.js', '/chat.js', '/strategy.js'];
+const CACHE = 'welfare-ai-v7';
+const ASSETS = [
+  '/', '/index.html',
+  '/app.css?v=7', '/core.js?v=7', '/wizard.js?v=7',
+  '/dashboard.js?v=7', '/chat.js?v=7', '/strategy.js?v=7', '/calendar.js?v=7',
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
