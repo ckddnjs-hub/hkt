@@ -22,18 +22,20 @@ window.addEventListener('DOMContentLoaded', async () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  // Supabase 익명 로그인
-  let { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    const { data } = await sb.auth.signInAnonymously();
-    session = data.session;
-  }
-  ME = session?.user ?? null;
-
-  // 프로필 로드
-  if (ME) {
-    const { data } = await sb.from('profiles').select('*').eq('id', ME.id).single();
-    MY_PROFILE = data;
+  // Supabase 익명 로그인 (실패해도 앱은 동작)
+  try {
+    let { data: { session } } = await sb.auth.getSession();
+    if (!session) {
+      const { data } = await sb.auth.signInAnonymously();
+      session = data?.session ?? null;
+    }
+    ME = session?.user ?? null;
+    if (ME) {
+      const { data } = await sb.from('profiles').select('*').eq('id', ME.id).single();
+      MY_PROFILE = data;
+    }
+  } catch (e) {
+    console.warn('Supabase 연결 실패, 오프라인 모드로 진행:', e.message);
   }
 
   // 로딩 화면 제거

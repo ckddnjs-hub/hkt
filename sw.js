@@ -1,4 +1,4 @@
-const CACHE = 'welfare-ai-v1';
+const CACHE = 'welfare-ai-v3';
 const ASSETS = ['/', '/index.html', '/app.css', '/core.js', '/wizard.js',
   '/dashboard.js', '/chat.js', '/strategy.js'];
 
@@ -9,8 +9,13 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
+  // chrome-extension, non-http 요청 무시
+  if (!e.request.url.startsWith('http')) return;
   if (e.request.method !== 'GET') return;
+  // Supabase 등 외부 API는 캐시하지 않음
+  if (e.request.url.includes('supabase.co') || e.request.url.includes('railway.app')) return;
   e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => {
+    if (!res || res.status !== 200 || res.type === 'opaque') return res;
     const clone = res.clone();
     caches.open(CACHE).then(c => c.put(e.request, clone));
     return res;
