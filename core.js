@@ -32,10 +32,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     ME = session?.user ?? null;
     if (ME) {
       const { data } = await sb.from('profiles').select('*').eq('id', ME.id).single();
-      MY_PROFILE = data;
+      if (data) MY_PROFILE = data;
     }
   } catch (e) {
     console.warn('Supabase 연결 실패, 오프라인 모드로 진행:', e.message);
+  }
+  // Supabase 실패 시 localStorage에서 복원
+  if (!MY_PROFILE) {
+    try {
+      const stored = localStorage.getItem('my_profile');
+      if (stored) MY_PROFILE = JSON.parse(stored);
+    } catch (_) {}
   }
 
   // 로딩 화면 제거
@@ -96,10 +103,16 @@ function navigateTo(page) {
 
 // ── 프로필 저장 ───────────────────────────────────────────────────────
 async function saveProfile(updates) {
-  if (!ME) return;
+  // localStorage에 항상 저장 (오프라인/익명 미지원 환경 대응)
+  const merged = { ...(MY_PROFILE || {}), ...updates };
+  try { localStorage.setItem('my_profile', JSON.stringify(merged)); } catch (_) {}
+  MY_PROFILE = merged;
+
+  // Supabase에도 저장 (로그인된 경우)
+  if (!ME) return { data: merged, error: null };
   const payload = { id: ME.id, ...updates, updated_at: new Date().toISOString() };
   const { data, error } = await sb.from('profiles').upsert(payload).select().single();
-  if (!error) MY_PROFILE = data;
+  if (!error && data) MY_PROFILE = data;
   return { data, error };
 }
 
