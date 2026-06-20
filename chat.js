@@ -131,9 +131,11 @@ function _renderGovMessages(el) {
 // ── 공통 포맷 ─────────────────────────────────────────────────────────
 function _chatFormatAI(text) {
   return text
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:underline">$1</a>')
     .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+    .replace(/^(\d+️⃣|[1-9]\.|[1-9]️⃣)\s*/gm, '<div style="margin-top:10px;font-weight:700;color:var(--primary)">$1 </div>')
     .replace(/\n/g, '<br>')
-    .replace(/^### (.*)/gm, '<div style="font-weight:900;margin:6px 0 2px">$1</div>')
+    .replace(/^#{1,3} (.*)/gm, '<div style="font-weight:900;margin:8px 0 2px">$1</div>')
     .replace(/^- (.*)/gm, '<div style="padding-left:10px">• $1</div>');
 }
 

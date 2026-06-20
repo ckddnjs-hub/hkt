@@ -12,109 +12,117 @@ module.exports = async function handler(req, res) {
   const BKEY = process.env.BKEY ? decodeURIComponent(process.env.BKEY) : '';
   const GPT_KEY = process.env.gpt_key || '';
 
-  if (!BKEY) return res.status(500).json({ text: '⚠️ BKEY 환경변수가 설정되지 않았습니다. Vercel 설정을 확인하세요.' });
+  if (!BKEY) return res.status(500).json({ text: '⚠️ BKEY 환경변수가 설정되지 않았습니다.' });
   if (!GPT_KEY) return res.status(500).json({ text: '⚠️ gpt_key 환경변수가 설정되지 않았습니다.' });
 
   try {
-    // 1. 프로필 기반 서비스 분야 결정
     const p = user_profile;
     const age = p.age || (p.birth_year ? new Date().getFullYear() - p.birth_year : 40);
-    const fields = resolveServiceFields(age, p);
 
-    // 2. gov24 API 검색 (키워드 + 서비스분야)
-    const services = await searchGov24(message, fields, BKEY);
+    // 1. 메시지+프로필에서 관련 서비스분야 추출
+    const fields = resolveFields(message, age, p);
 
-    // 3. 프로필 요약 문자열
-    const profileSummary = buildProfileSummary(age, p);
+    // 2. gov24 병렬 검색 → 중복 제거 → 최대 50건
+    const services = await fetchServices(fields, BKEY);
 
-    // 4. GPT 응답 생성
-    const text = await askGPT(message, profileSummary, services, history, GPT_KEY);
+    // 3. GPT 응답 (이전 대화 반영)
+    const profileSummary = buildProfile(age, p);
+    const isFollowUp = history.length >= 2;
+    const text = await askGPT(message, profileSummary, services, history, GPT_KEY, isFollowUp);
 
     return res.json({ text, source_count: services.length });
   } catch (e) {
     console.error('welfare-chat error:', e);
-    return res.status(500).json({ text: `⚠️ 서버 오류가 발생했어요: ${e.message}` });
+    return res.status(500).json({ text: `⚠️ 서버 오류: ${e.message}` });
   }
 };
 
-// ── 프로필 → 관련 서비스분야 ─────────────────────────────────────────
-function resolveServiceFields(age, p) {
-  const fields = [];
-  if (age >= 65)                    fields.push('노인·요양');
-  if (age < 19)                     fields.push('보육·교육 및 취약아동지원');
-  if (p.has_disability)             fields.push('장애인');
-  if (p.has_infant)                 fields.push('임신·출산');
-  if (p.is_single_parent)          fields.push('가족지원');
-  if (p.housing_type === 'monthly_rent' || p.housing_type === 'jeonse')
-                                    fields.push('주거');
-  if (!fields.length)               fields.push('생활지원'); // 기본
-  return fields.slice(0, 3);
+// ── 서비스분야 결정 (메시지 키워드 + 프로필) ──────────────────────────
+function resolveFields(message, age, p) {
+  const fields = new Set();
+  const m = message;
+
+  if (/주거|월세|전세|임대|주택|집/.test(m))             fields.add('주거');
+  if (/노인|어르신|연금|고령|기초연금/.test(m))          fields.add('노인·요양');
+  if (/장애/.test(m))                                    fields.add('장애인');
+  if (/임신|출산|육아|아이|아동|영유아|보육/.test(m))    fields.add('임신·출산');
+  if (/취업|고용|일자리|실업|구직/.test(m))              fields.add('일자리');
+  if (/교육|학비|장학|학교/.test(m))                    fields.add('교육');
+  if (/한부모/.test(m))                                  fields.add('가족지원');
+  if (/의료|병원|건강|치료|약/.test(m))                  fields.add('건강');
+  if (/기초|차상위|수급/.test(m))                        fields.add('생활지원');
+
+  // 프로필 기반
+  if (age >= 65)              fields.add('노인·요양');
+  if (age < 19)               fields.add('보육·교육 및 취약아동지원');
+  if (p.has_disability)       fields.add('장애인');
+  if (p.has_infant)           fields.add('임신·출산');
+  if (p.is_single_parent)    fields.add('가족지원');
+  if (p.is_low_income)        fields.add('생활지원');
+  if (p.housing_type === 'monthly_rent') fields.add('주거');
+
+  // 항상 기본 포함
+  fields.add('생활지원');
+
+  return [...fields].slice(0, 5);
 }
 
-// ── gov24 API 검색 ───────────────────────────────────────────────────
-async function searchGov24(message, fields, key) {
+// ── gov24 병렬 호출 ──────────────────────────────────────────────────
+async function fetchServices(fields, key) {
   const BASE = 'https://api.odcloud.kr/api/gov24/v3/serviceList';
-  const allResults = [];
 
-  // 키워드 검색 (메시지 앞 20자)
-  const keyword = message.replace(/[?？]/g, '').slice(0, 20).trim();
+  // 각 서비스분야별로 15건씩 병렬 요청
+  // URLSearchParams 를 사용하지 않고 직접 URL 조합 → [ ] 인코딩 문제 방지
+  const requests = fields.map(field => {
+    const encodedKey = encodeURIComponent(key);
+    const encodedField = encodeURIComponent(field);
+    // cond 파라미터의 대괄호는 raw 그대로 (서버가 literal [] 기대)
+    const url = `${BASE}?serviceKey=${encodedKey}&page=1&perPage=15&returnType=JSON&cond[서비스분야::LIKE]=${encodedField}`;
+    return fetch(url, { signal: AbortSignal.timeout(9000) })
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(body => body.data || [])
+      .catch(() => []);
+  });
 
-  const queries = [];
-  if (keyword) {
-    queries.push({ 'cond[서비스명::LIKE]': keyword });
-  }
-  // 서비스분야별 검색 (최대 2개)
-  for (const field of fields.slice(0, 2)) {
-    queries.push({ 'cond[서비스분야::LIKE]': field });
-  }
+  // 추가: 기본 첫 페이지도 가져와서 커버리지 보강
+  const encodedKey = encodeURIComponent(key);
+  requests.push(
+    fetch(`${BASE}?serviceKey=${encodedKey}&page=1&perPage=20&returnType=JSON`, { signal: AbortSignal.timeout(9000) })
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(body => body.data || [])
+      .catch(() => [])
+  );
 
-  for (const extra of queries) {
-    try {
-      const params = new URLSearchParams({
-        serviceKey: key,
-        page: '1',
-        perPage: '15',
-        returnType: 'JSON',
-        ...extra,
-      });
-      const r = await fetch(`${BASE}?${params}`, { signal: AbortSignal.timeout(8000) });
-      if (!r.ok) continue;
-      const body = await r.json();
-      const items = body.data || [];
-      for (const item of items) {
-        const sid = item['서비스ID'];
-        if (sid && !allResults.find(x => x['서비스ID'] === sid)) {
-          allResults.push(item);
-        }
+  const results = await Promise.allSettled(requests);
+
+  // 중복 제거 (서비스ID 기준)
+  const seen = new Set();
+  const merged = [];
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const item of r.value) {
+      const sid = item['서비스ID'];
+      if (sid && !seen.has(sid)) {
+        seen.add(sid);
+        merged.push(item);
       }
-    } catch { /* 개별 쿼리 실패 무시 */ }
-    if (allResults.length >= 20) break;
-  }
-
-  // 쿼리가 모두 실패했거나 결과 없으면 첫 페이지 fallback
-  if (allResults.length === 0) {
-    const params = new URLSearchParams({ serviceKey: key, page: '1', perPage: '20', returnType: 'JSON' });
-    const r = await fetch(`${BASE}?${params}`, { signal: AbortSignal.timeout(10000) });
-    if (r.ok) {
-      const body = await r.json();
-      allResults.push(...(body.data || []).slice(0, 20));
     }
   }
 
-  return allResults.slice(0, 20);
+  return merged.slice(0, 50);
 }
 
-// ── 프로필 요약 ─────────────────────────────────────────────────────
-function buildProfileSummary(age, p) {
+// ── 프로필 요약 ───────────────────────────────────────────────────────
+function buildProfile(age, p) {
   return [
     `나이: ${age}세`,
     p.gender === 'female' ? '여성' : p.gender === 'male' ? '남성' : '',
     p.region ? `거주지: ${[p.region, p.district].filter(Boolean).join(' ')}` : '',
-    p.household_type ? `가구형태: ${{ single:'1인가구', couple:'부부', family:'자녀포함', single_parent:'한부모가정', other:'기타' }[p.household_type] || p.household_type}` : '',
+    p.household_type ? `가구: ${{ single:'1인가구', couple:'부부', family:'자녀포함', single_parent:'한부모가정', other:'기타' }[p.household_type] || p.household_type}` : '',
     p.income_level ? `소득: 중위소득 ${p.income_level}%` : '',
     p.income_amount ? `월소득: 약 ${p.income_amount}만원` : '',
-    p.housing_type ? `주거형태: ${{ own:'자가', jeonse:'전세', monthly_rent:'월세', public:'공공임대', other:'기타' }[p.housing_type] || p.housing_type}` : '',
-    p.has_disability ? '장애인' : '',
+    p.housing_type ? `주거: ${{ own:'자가', jeonse:'전세', monthly_rent:'월세', public:'공공임대', other:'기타' }[p.housing_type] || p.housing_type}` : '',
+    p.has_disability ? '장애인 등록' : '',
     p.has_infant ? '영유아 자녀 있음' : '',
     p.is_single_parent ? '한부모 가정' : '',
     p.is_low_income ? '기초수급·차상위' : '',
@@ -122,49 +130,76 @@ function buildProfileSummary(age, p) {
 }
 
 // ── GPT 호출 ─────────────────────────────────────────────────────────
-async function askGPT(message, profileSummary, services, history, key) {
+async function askGPT(message, profileSummary, services, history, key, isFollowUp) {
   const serviceText = services.length
-    ? services.map((s, i) => {
+    ? services.slice(0, 40).map((s, i) => {
         const name    = s['서비스명'] || '';
-        const content = (s['지원내용'] || '').slice(0, 120);
-        const method  = (s['신청방법'] || '').slice(0, 60);
+        const content = (s['지원내용'] || '').slice(0, 150);
+        const method  = (s['신청방법'] || '').slice(0, 80);
         const url     = s['상세조회URL'] || '';
         const agency  = s['소관기관명'] || '';
-        return `${i + 1}. **${name}** (${agency})\n   지원내용: ${content}\n   신청방법: ${method}${url ? `\n   상세URL: ${url}` : ''}`;
-      }).join('\n')
+        const field   = s['서비스분야'] || '';
+        return `[${i+1}] ${name} (${agency} | ${field})\n지원: ${content}\n신청: ${method}${url ? `\nURL: ${url}` : ''}`;
+      }).join('\n\n')
     : '(검색 결과 없음)';
 
   const systemPrompt = `당신은 한국 복지 혜택 전문 AI 상담사입니다.
-사용자 프로필과 공공 복지서비스 데이터(행정안전부 gov24 API)를 바탕으로 맞춤 혜택을 친절하게 안내합니다.
-답변 규칙:
-- 한국어로 대화체로 답변
-- 사용자 프로필에 맞는 서비스만 추천 (맞지 않으면 그 이유 언급)
-- 혜택명, 지원내용, 신청방법을 포함
-- 이모지 적절 사용
-- 500자 이내로 간결하게
-- 마지막에 "더 궁금한 점이 있으면 물어보세요 😊" 추가`;
+행정안전부 gov24 공공 복지서비스 데이터와 사용자 프로필을 바탕으로 맞춤 혜택을 안내합니다.
 
-  const userContent = `[사용자 프로필]\n${profileSummary || '프로필 정보 없음'}\n\n[공공 복지서비스 검색 결과 (${services.length}건)]\n${serviceText}\n\n[사용자 질문]\n${message}`;
+[답변 형식 - 반드시 준수]
+첫 질문이라면:
+1️⃣ **혜택명** (소관기관)
+   - 지원내용: (1~2줄)
+   - 신청방법: (간략히)
+   - 🔗 [신청하기](URL)
+
+위 형식으로 우선순위 상위 5개를 번호 순으로 나열하세요.
+마지막에 한 줄 요약: "총 N개 혜택 중 가장 적합한 5개를 선별했어요 😊"
+
+후속 질문이라면: 이전 대화 맥락을 반영해 자연스럽게 답변하세요.
+
+[공통 규칙]
+- 사용자 프로필(나이·소득·가구형태)에 맞지 않는 서비스는 제외
+- 한국어, 친절한 대화체
+- URL이 있으면 반드시 포함`;
+
+  // 이전 대화를 GPT messages에 추가 (최대 최근 8턴)
+  const historyMessages = history.slice(-8).map(h => ({
+    role: h.role === 'ai' ? 'assistant' : 'user',
+    content: typeof h.content === 'string' ? h.content.slice(0, 500) : '',
+  }));
+
+  // 현재 요청 메시지 구성
+  let userContent;
+  if (isFollowUp) {
+    // 후속 질문: 서비스 목록은 줄이고 대화 맥락 강조
+    userContent = `[사용자 프로필]\n${profileSummary}\n\n[추가 검색된 서비스 (참고용)]\n${serviceText.slice(0, 2000)}\n\n[후속 질문]\n${message}\n\n이전 대화 내역을 참고해 답변해 주세요.`;
+  } else {
+    // 첫 질문: 전체 서비스 목록 제공
+    userContent = `[사용자 프로필]\n${profileSummary}\n\n[gov24 검색 결과 (${services.length}건)]\n${serviceText}\n\n[질문]\n${message}\n\n위 데이터에서 이 사용자에게 가장 적합한 상위 5개를 우선순위 순으로 추천해 주세요.`;
+  }
 
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...history.slice(-6).map(h => ({
-      role: h.role === 'ai' ? 'assistant' : 'user',
-      content: h.content,
-    })),
+    ...historyMessages,
     { role: 'user', content: userContent },
   ];
 
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({ model: 'gpt-4o', messages, max_tokens: 800, temperature: 0.7 }),
-    signal: AbortSignal.timeout(25000),
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages,
+      max_tokens: 1200,
+      temperature: 0.5,
+    }),
+    signal: AbortSignal.timeout(30000),
   });
 
   if (!r.ok) {
     const err = await r.json().catch(() => ({}));
-    throw new Error(`OpenAI 오류 ${r.status}: ${err.error?.message || JSON.stringify(err)}`);
+    throw new Error(`OpenAI ${r.status}: ${err.error?.message || r.statusText}`);
   }
 
   const data = await r.json();
