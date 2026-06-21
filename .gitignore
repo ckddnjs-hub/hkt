@@ -1,0 +1,7 @@
+node_modules/
+backend/.env
+.env
+*.log
+.DS_Store
+Thumbs.db
+새 텍스트 문서.txt
