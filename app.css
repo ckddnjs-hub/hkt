@@ -1,8 +1,8 @@
-/* 복지혜택 AI PWA — Notion 스타일 */
+/* 蹂듭??쒗깮 AI PWA ??Notion ?ㅽ???*/
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ── 다크 모드 (기본 / Notion Dark) ── */
+/* ?? ?ㅽ겕 紐⑤뱶 (湲곕낯 / Notion Dark) ?? */
 :root {
   --primary:#2eaadc; --primary-dark:#1a8fbf; --primary-light:rgba(46,170,220,.12);
   --accent:#9b8afb; --danger:#e03e3e; --warn:#dfab01; --success:#0f7b6c;
@@ -15,7 +15,7 @@
   --chart-title:#9b9894;
 }
 
-/* ── 라이트 모드 (Notion Light) ── */
+/* ?? ?쇱씠??紐⑤뱶 (Notion Light) ?? */
 body.light {
   --primary:#0f7b6c; --primary-dark:#0a5c50; --primary-light:rgba(15,123,108,.1);
   --accent:#6e5acd; --danger:#e03e3e; --warn:#c87f0a; --success:#0f7b6c;
@@ -43,7 +43,7 @@ body.ready{visibility:visible}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
 
-/* ── 로딩 ── */
+/* ?? 濡쒕뵫 ?? */
 #loading-screen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;transition:opacity .3s}
 #loading-screen.hidden{opacity:0;pointer-events:none}
 .ld-icon{font-size:3rem}
@@ -51,7 +51,7 @@ body.ready{visibility:visible}
 .ld-sub{color:var(--text-muted);font-size:.83rem}
 .spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}
 
-/* ── 앱 셸 ── */
+/* ?? ?????? */
 #app{display:none;min-height:100vh;flex-direction:column}
 #app.show{display:flex}
 
@@ -74,7 +74,7 @@ body.light .app-header-logo{color:var(--text)}
   font-size:.9rem;cursor:pointer;
 }
 
-/* 테마 토글 */
+/* ?뚮쭏 ?좉? */
 .theme-toggle{
   width:28px;height:28px;border-radius:var(--radius);border:1px solid var(--border);
   background:var(--bg3);color:var(--text-muted);
@@ -86,7 +86,7 @@ body.light .app-header-logo{color:var(--text)}
 
 .app-body{flex:1;overflow-y:auto;padding-bottom:calc(60px + env(safe-area-inset-bottom,0px))}
 
-/* ── 하단 네비 ── */
+/* ?? ?섎떒 ?ㅻ퉬 ?? */
 .bottom-nav{
   position:fixed;bottom:0;left:0;right:0;z-index:200;
   background:var(--bg);border-top:1px solid var(--border);
@@ -118,11 +118,11 @@ body.light .nav-fab-circle{box-shadow:0 2px 12px rgba(15,123,108,.3)}
 .nav-fab-circle svg{width:24px;height:24px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .nav-fab.active .nav-fab-circle{transform:scale(1.08);box-shadow:0 4px 16px rgba(46,170,220,.45)}
 
-/* ── 페이지 ── */
+/* ?? ?섏씠吏 ?? */
 .page{display:none;animation:fadeIn .2s ease}
 .page.active{display:block}
 
-/* ── 공통 카드 ── */
+/* ?? 怨듯넻 移대뱶 ?? */
 .card{
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--radius);padding:14px;margin-bottom:8px;
@@ -155,7 +155,7 @@ body:not(.light) .badge-green{background:rgba(15,123,108,.2);color:#4ec9b0}
 .btn-full{width:100%}
 .btn-lg{padding:12px 20px;font-size:.95rem}
 
-/* ══ 위저드 (점진적 폼) ════════════════════════════════════════════════ */
+/* ?먥븧 ?꾩???(?먯쭊???? ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 #page-wizard{background:var(--bg);min-height:100vh}
 .wizard-progress-bar{height:3px;background:var(--border);position:sticky;top:0;z-index:10}
 .wizard-progress-fill{height:100%;background:var(--primary);transition:width .4s ease}
@@ -239,6 +239,62 @@ body.light .pf-step.pf-active{box-shadow:0 0 0 2px var(--primary-light)}
 }
 .pf-check-item.checked .pf-checkbox{background:var(--primary);border-color:var(--primary);color:#fff}
 
+/* ?? 蹂듭? ?ㅻ퉬寃뚯씠??移몃컲 ?? */
+.nav-avail-item{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 0;border-bottom:1px solid var(--border);
+}
+.nav-avail-item:last-child{border-bottom:none}
+.nav-avail-info{flex:1;min-width:0}
+.nav-avail-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nav-avail-amount{font-size:.72rem;color:var(--primary);margin-top:1px}
+.nav-avail-actions{display:flex;gap:5px;flex-shrink:0}
+.nav-action-btn{
+  width:30px;height:30px;border-radius:var(--radius);
+  border:1px solid var(--border);background:var(--bg3);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:.82rem;flex-shrink:0;transition:all .15s;
+}
+.nav-action-btn:hover{border-color:rgba(99,102,241,.5);background:rgba(99,102,241,.1)}
+.nav-action-btn:active{opacity:.7}
+.nav-date-btn{
+  position:relative;width:30px;height:30px;border-radius:var(--radius);
+  background:var(--primary-light);border:1px solid var(--primary);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.82rem;cursor:pointer;flex-shrink:0;overflow:hidden;
+}
+.nav-date-btn input[type="date"]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;font-size:0;
+}
+.nav-zone-row{display:flex;gap:8px;margin-top:12px}
+.nav-zone{
+  flex:1;border:1.5px dashed var(--border);border-radius:var(--radius);
+  padding:10px;min-height:100px;
+}
+.nav-zone.consult{border-color:rgba(99,102,241,.4)}
+.nav-zone.cal-zone{border-color:rgba(46,170,220,.4)}
+.nav-zone-header{
+  font-size:.72rem;font-weight:700;margin-bottom:8px;
+  display:flex;align-items:center;gap:4px;
+}
+.nav-zone-empty{
+  font-size:.7rem;color:var(--text-dim);
+  text-align:center;padding:10px 0;line-height:1.7;
+}
+.nav-zone-card{
+  padding:6px 8px;border-radius:4px;margin-bottom:5px;
+  display:flex;align-items:flex-start;gap:4px;
+}
+.nav-zone.consult .nav-zone-card{background:rgba(99,102,241,.12)}
+.nav-zone.cal-zone .nav-zone-card{background:rgba(46,170,220,.12)}
+.nav-zone-card-name{font-size:.75rem;font-weight:600;flex:1;min-width:0;line-height:1.3}
+.nav-zone-card-sub{font-size:.68rem;color:var(--text-muted);margin-top:1px}
+.nav-zone-del{
+  background:none;border:none;color:var(--text-dim);cursor:pointer;
+  font-size:.72rem;padding:0 2px;flex-shrink:0;line-height:1;
+}
+.nav-zone-del:hover{color:var(--danger)}
+
 .gps-btn{
   display:flex;align-items:center;gap:8px;padding:10px;
   border-radius:var(--radius);border:1px dashed var(--border-strong);
@@ -253,7 +309,7 @@ body.light .pf-step.pf-active{box-shadow:0 0 0 2px var(--primary-light)}
   border-left:2px solid var(--primary);
 }
 
-/* ══ 대시보드 ══════════════════════════════════════════════════════════ */
+/* ?먥븧 ??쒕낫???먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 .dashboard-hero{
   padding:20px 16px 16px;
   border-bottom:1px solid var(--border);
@@ -288,7 +344,7 @@ body.light .hero-stat{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,
 .benefit-amount{font-size:.78rem;color:var(--primary);font-weight:600}
 .benefit-how{font-size:.7rem;color:var(--text-muted);margin-top:1px}
 
-/* ══ 채팅 탭 ═══════════════════════════════════════════════════════════ */
+/* ?먥븧 梨꾪똿 ???먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧??*/
 .chat-tab-bar{
   display:flex;border-bottom:1px solid var(--border);
   background:var(--bg);position:sticky;top:0;z-index:10;transition:background .2s;
@@ -300,7 +356,7 @@ body.light .hero-stat{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,
 }
 .chat-tab-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
 
-/* ══ 채팅 ══════════════════════════════════════════════════════════════ */
+/* ?먥븧 梨꾪똿 ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 .chat-messages{padding:14px;display:flex;flex-direction:column;gap:10px;min-height:calc(100vh - 200px)}
 .chat-bubble{
   max-width:86%;padding:10px 13px;
@@ -345,7 +401,7 @@ body.light .chat-bubble.ai{box-shadow:0 1px 3px rgba(0,0,0,.06)}
 .typing-dots span:nth-child(3){animation-delay:.4s}
 @keyframes typingDot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
 
-/* ══ 전략보드 ══════════════════════════════════════════════════════════ */
+/* ?먥븧 ?꾨왂蹂대뱶 ?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 .strategy-section{padding:0 16px 16px}
 .chart-wrap{
   background:var(--surface);border:1px solid var(--border);
@@ -357,7 +413,7 @@ body.light .chart-wrap{box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .scatter-legend-item{display:flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text-muted)}
 .scatter-legend-dot{width:8px;height:8px;border-radius:50%}
 
-/* 복지 네비게이션 경로 */
+/* 蹂듭? ?ㅻ퉬寃뚯씠??寃쎈줈 */
 .nav-path{display:flex;flex-direction:column;gap:0;padding:6px 0}
 .nav-node{display:flex;align-items:center;gap:10px;position:relative}
 .nav-node-dot{
@@ -373,10 +429,10 @@ body.light .chart-wrap{box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .nav-node-amount{font-size:.78rem;color:var(--primary);font-weight:600}
 .nav-connector{width:1px;height:20px;background:var(--border);margin-left:16px;flex-shrink:0}
 
-/* 레이더 차트 */
+/* ?덉씠??李⑦듃 */
 .radar-wrap{position:relative;height:240px}
 
-/* ══ 캘린더 ══════════════════════════════════════════════════════════ */
+/* ?먥븧 罹섎┛???먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 .calendar-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}
 .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 10px}
 .cal-day-name{text-align:center;font-size:.68rem;color:var(--text-dim);padding:4px 0;font-weight:600}
@@ -392,7 +448,7 @@ body.light .chart-wrap{box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .event-title{font-size:.86rem;font-weight:600;margin-bottom:2px}
 .event-desc{font-size:.76rem;color:var(--text-muted)}
 
-/* ══ 내정보 ══════════════════════════════════════════════════════════ */
+/* ?먥븧 ?댁젙蹂??먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧?먥븧 */
 .profile-avatar{
   width:64px;height:64px;border-radius:50%;
   background:var(--bg3);border:1px solid var(--border);
@@ -404,7 +460,7 @@ body.light .chart-wrap{box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .profile-item-label{font-size:.83rem;color:var(--text-muted)}
 .profile-item-value{font-size:.85rem;font-weight:600;color:var(--text)}
 
-/* ── 토스트 ── */
+/* ?? ?좎뒪???? */
 .toast{
   position:fixed;top:calc(48px + 8px + env(safe-area-inset-top,0px));
   left:50%;transform:translateX(-50%);

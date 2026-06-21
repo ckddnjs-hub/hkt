@@ -90,6 +90,23 @@ function _calBuildEvents() {
     }
   });
 
+  // 사용자가 전략보드에서 등록한 일정
+  try {
+    const scheduled = JSON.parse(localStorage.getItem('welfare_schedule') || '[]');
+    scheduled.forEach(s => {
+      if (!s.date) return;
+      const d = new Date(s.date + 'T00:00:00');
+      if (!isNaN(d.getTime())) {
+        events.push({
+          date: d, label: s.name,
+          type: 'welfare_plan',
+          desc: `직접 등록 · ${s.amount || s.desc || ''}`.replace(/·\s*$/, '').trim(),
+          color: '#2eaadc',
+        });
+      }
+    });
+  } catch {}
+
   // 기본 법정 마감일 (항상 표시)
   const year = _calYear;
   [
@@ -139,8 +156,8 @@ function _renderEventList(events) {
         <div class="event-title" style="color:${e.color}">${esc(e.label)}</div>
         <div class="event-desc">${esc(e.desc)}</div>
       </div>
-      <div class="badge ${e.type==='urgent'?'badge-red':e.type==='deadline'?'badge-yellow':'badge-purple'}" style="font-size:.65rem;align-self:flex-start">
-        ${e.type==='urgent'?'긴급':e.type==='deadline'?'마감':'정기'}
+      <div class="badge ${e.type==='urgent'?'badge-red':e.type==='deadline'?'badge-yellow':e.type==='welfare_plan'?'badge-green':'badge-purple'}" style="font-size:.65rem;align-self:flex-start">
+        ${e.type==='urgent'?'긴급':e.type==='deadline'?'마감':e.type==='welfare_plan'?'예정':'정기'}
       </div>
     </div>`).join('');
 }
