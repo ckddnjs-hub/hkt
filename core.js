@@ -17,9 +17,12 @@ let currentPage = '';
 
 // ── 앱 초기화 ──────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
-  // PWA 서비스워커 등록
+  // PWA 서비스워커 등록 + 업데이트 시 자동 새로고침
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.serviceWorker.addEventListener('message', e => {
+      if (e.data?.type === 'SW_UPDATED') window.location.reload();
+    });
   }
 
   // Supabase 익명 로그인 (실패해도 앱은 동작)

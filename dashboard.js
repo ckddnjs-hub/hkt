@@ -214,6 +214,9 @@ async function loadFromSupabase() {
     // ③ 자격 매칭 (행정안전부 = 조건 규칙, 지자체 = 조건 없으면 통과)
     const eligible = [];
     for (const svc of (services || [])) {
+      // 다른 시군구 서비스 제외 (예: 영월군 서비스를 대전 사용자에게 노출 방지)
+      if (svc.region_sigungu && sigungu && svc.region_sigungu !== sigungu) continue;
+
       const cond = condMap[svc.service_id];
 
       // 조건 데이터 없는 서비스 → 지자체 서비스거나 조건 미입력 → 일단 포함

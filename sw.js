@@ -1,15 +1,21 @@
-const CACHE = 'welfare-ai-v15';
+const CACHE = 'welfare-ai-v16';
 const ASSETS = [
   '/', '/index.html',
-  '/app.css?v=15', '/core.js?v=15', '/wizard.js?v=15',
-  '/dashboard.js?v=15', '/chat.js?v=15', '/strategy.js?v=15', '/calendar.js?v=15',
+  '/app.css?v=16', '/core.js?v=16', '/wizard.js?v=16',
+  '/dashboard.js?v=16', '/chat.js?v=16', '/strategy.js?v=16', '/calendar.js?v=16',
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(
+    caches.keys()
+      .then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' })))
+  );
 });
 self.addEventListener('fetch', e => {
   // chrome-extension, non-http 요청 무시
